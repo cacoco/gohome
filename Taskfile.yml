@@ -1,0 +1,21 @@
+# https://taskfile.dev
+
+version: '3'
+
+includes:
+  cargo: .cargo/Taskfile.yml
+
+# optional configurations (output, silent, method, run, etc.)
+# vars:
+# env:
+
+tasks:
+  'markdown:lint':
+    cmds:
+      - 'markdownlint **/*.md --fix --disable MD013'
+    sources:
+      - '**/.md'
+  
+  'rust:version':
+    cmds:
+      - 'toml get -r rust-toolchain.toml toolchain.channel'

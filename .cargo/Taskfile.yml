@@ -1,0 +1,72 @@
+# https://taskfile.dev
+
+version: '3'
+
+env:
+  RUST_BACKTRACE: '1'
+
+tasks:
+  build:
+    cmds:
+      - 'cargo build --all-targets --all-features --verbose'
+    sources:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+  check:
+    cmds:
+      - 'cargo check --all-targets --all-features'
+    sources:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+  clean:
+    cmds:
+      - 'cargo clean'
+      - 'rm -fr dist/'
+    sources:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  
+  coverage:
+    cmds:
+      - 'cargo llvm-cov --all-targets --all-features --lcov --output-path lcov.info nextest'
+    sources:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+  doc:
+    cmds:
+      - 'cargo doc --all-features --document-private-items'
+    sources:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+  format:
+    cmds:
+      - 'cargo fmt --all'
+    sources:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+  lint:
+    cmds:
+      - 'cargo clippy --all-targets --all-features --fix --allow-staged -- -D warnings'
+    sources:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+  test:
+    cmds:
+      - 'cargo nextest run --all-targets --all-features --verbose --no-tests warn'
+    sources:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'

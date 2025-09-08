@@ -1,0 +1,41 @@
+services:
+  # The Trailbase database service
+  trailbase-db:
+    # Use the official Trailbase image
+    image: trailbase/trailbase:latest
+    # Map port 4000 on the host to port 4000 on the container
+    ports:
+      - "4000:4000"
+    # Add this volume mapping
+    volumes:
+      - ./traildepot:/app/traildepot
+    # Set the network for this service
+    networks:
+      - app-network
+
+  # The Rust application service
+  rust-app:
+    image: ghcr.io/cacoco/gohome:latest
+    # Set environment variables for the Rust application
+    environment:
+      - RUST_LOG=trace
+      - RUST_BACKTRACE=full
+      - HOST=0.0.0.0:3030
+      - DB_HOST=http://trailbase-db:4000
+    # Map port 3030 on the host to port 3030 on the container
+    ports:
+      - "3030:3030"
+    # Specify that this service depends on the trailbase-db service
+    # This ensures that the database is started before the application
+    depends_on:
+      - trailbase-db
+    # Set the network for this service
+    networks:
+      - app-network 
+
+# Define the network for the services
+networks:
+  app-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"

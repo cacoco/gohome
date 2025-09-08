@@ -1,0 +1,91 @@
+version: 2
+
+project_name: gohome
+
+archives:
+  - formats: [tar.gz]
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+before:
+  hooks:
+    - rustup default stable
+    - rustup target add x86_64-unknown-linux-musl
+    - cargo install --locked cargo-zigbuild
+    - cargo fetch --locked
+
+builds:
+  - builder: rust
+    flags:
+      - --release
+    targets:
+      - x86_64-unknown-linux-musl
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+checksum:
+  name_template: "{{ .ProjectName }}_checksums.txt"
+
+dockers:
+  - image_templates:
+      - "ghcr.io/cacoco/gohome:{{ .Tag }}"
+      - "ghcr.io/cacoco/gohome:latest"
+    dockerfile: Dockerfile
+    extra_files:
+      - entrypoint.sh
+
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    args:
+      - "sign"
+      - "${artifact}"
+      - "--yes"
+
+milestones:
+  - repo:
+      owner: cacoco
+      name: gohome
+    close: true
+    fail_on_error: false
+    name_template: "{{ .Tag }}"
+
+release:
+  github:
+    owner: cacoco
+    name: gohome
+  mode: replace
+  footer: >-
+
+    ---
+
+    Released by [GoReleaser](https://github.com/goreleaser/goreleaser).
+
+sboms:
+  - artifacts: archive
+
+signs:
+  - cmd: cosign
+    stdin: "{{ .Env.COSIGN_PWD }}"
+    args:
+      - "sign-blob"
+      - "--key=cosign.key"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes" # needed for cosign 2.0.0+
+    artifacts: all
