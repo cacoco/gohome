@@ -12,19 +12,6 @@ pub struct CreateUpdateRequest {
     pub owner: Option<String>,
 }
 
-impl CreateUpdateRequest {
-    fn into_with(self, original_link: model::Link) -> model::Link {
-        model::Link {
-            id: model::normalized_id(&self.short),
-            short: self.short.clone(),
-            long: self.target.clone(),
-            created: original_link.created,
-            updated: chrono::Utc::now(),
-            owner: self.owner.clone(),
-        }
-    }
-}
-
 impl Into<model::Link> for CreateUpdateRequest {
     fn into(self) -> model::Link {
         model::Link {
@@ -43,20 +30,20 @@ pub struct LinkResponse {
     short: String,
     target: String,
     owner: Option<String>,
-    #[serde(with = "chrono::serde::ts_seconds")]
     created: chrono::DateTime<chrono::Utc>,
-    #[serde(with = "chrono::serde::ts_seconds")]
     updated: chrono::DateTime<chrono::Utc>,
+    csrf_string: String,
 }
 
-impl From<model::Link> for LinkResponse {
-    fn from(value: model::Link) -> Self {
+impl model::Link {
+    fn into_with(&self, csrf_string: String) -> LinkResponse {
         LinkResponse {
-            short: value.short,
-            target: value.long,
-            owner: value.owner,
-            created: value.created,
-            updated: value.updated,
+            short: self.short.clone(),
+            target: self.long.clone(),
+            owner: self.owner.clone(),
+            created: self.created,
+            updated: self.updated,
+            csrf_string,
         }
     }
 }
@@ -65,5 +52,11 @@ impl From<model::Link> for LinkResponse {
 pub struct DetailsResponse {
     pub link: model::Link,
     pub stats: Option<model::ClickStats>,
+    pub csrf_string: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AllResponse {
+    pub links: Vec<model::Link>,
     pub csrf_string: String,
 }

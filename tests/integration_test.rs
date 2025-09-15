@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gohome::{CreateUpdateRequest, db, handlers, model};
+use gohome::{db, handlers, model, CreateUpdateRequest};
 use rusqlite::Connection;
 use warp::reply::Reply;
 
@@ -89,10 +89,9 @@ async fn test_handlers() -> Result<(), Box<dyn std::error::Error + 'static>> {
     assert_eq!(response.headers().get("Location").unwrap().to_str().unwrap(), "/nyt");
 
     let mut from_db_link = db.link.get("nyt").await?;
-    // println!("{}", &from_db_link);
     assert_eq!(from_db_link.short, "nyt");
 
-    reply = handlers::get("nyt", "/nyt", HashMap::new(), db.clone()).await?;
+    reply = handlers::get("nyt", "/", HashMap::new(), db.clone()).await?;
     response = reply.into_response();
     assert_eq!(response.status(), warp::http::StatusCode::MOVED_PERMANENTLY);
     assert_eq!(
@@ -122,9 +121,12 @@ async fn test_handlers() -> Result<(), Box<dyn std::error::Error + 'static>> {
     let all_body = response.into_body();
     let all_body_bytes = all_body.collect().await?;
     let all_body_string = String::from_utf8(all_body_bytes.to_bytes().to_vec())?;
-    let links: HashMap<String, model::Link> = serde_json::from_str(&all_body_string)?;
-    assert!(links.len() == 1);
-    assert!(links.get("nyt").is_some_and(|link| link.long == "https://example.com"));
+    println!("{}", all_body_string);
+    let all_links_response: gohome::AllResponse = serde_json::from_str(&all_body_string)?;
+    assert!(all_links_response.links.len() == 1);
+    let link = all_links_response.links.get(0).unwrap();
+    assert_eq!(link.short, String::from("nyt"));
+    assert_eq!(link.long, String::from("https://example.com"));
 
     reply = handlers::detail("nyt", db.clone()).await?;
     response = reply.into_response();

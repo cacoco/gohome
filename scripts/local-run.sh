@@ -32,8 +32,8 @@ main() {
     for arg in "$@"; do
     shift
     case "$arg" in
-        "--build")  build=true ;;
-        "--help")   print_usage >&2; exit ;;
+        "-b" | "--build")  build=true ;;
+        "-h" | "--help")   print_usage >&2; exit ;;
         *)          check_arg "$arg"
     esac
     done
