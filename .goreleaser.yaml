@@ -43,8 +43,8 @@ checksum:
 
 dockers:
   - image_templates:
-      - "ghcr.io/angstromio/gohome:{{ .Tag }}"
-      - "ghcr.io/angstromio/gohome:latest"
+      - "ghcr.io/cacoco/gohome:{{ .Tag }}"
+      - "ghcr.io/cacoco/gohome:latest"
     dockerfile: Dockerfile
     extra_files:
       - entrypoint.sh
@@ -65,7 +65,7 @@ docker_signs:
 
 milestones:
   - repo:
-      owner: angstromio
+      owner: cacoco
       name: gohome
     close: true
     fail_on_error: false
@@ -73,7 +73,7 @@ milestones:
 
 release:
   github:
-    owner: angstromio
+    owner: cacoco
     name: gohome
   mode: replace
   footer: >-

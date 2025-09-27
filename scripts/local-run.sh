@@ -79,7 +79,7 @@ main() {
     fi
 
     base=$(pwd)
-    docker run -v "$base:/home/nonroot" -p 8080:8080 -e "RUST_LOG=trace" ghcr.io/angstromio/gohome:latest --domain="localhost:8080" --host="0.0.0.0:8080"
+    docker run -v "$base:/home/nonroot" -p 8080:8080 -e "RUST_LOG=trace" ghcr.io/cacoco/gohome:latest --domain="localhost:8080" --host="0.0.0.0:8080"
 }
 
 main "$@"
