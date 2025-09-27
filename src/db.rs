@@ -84,9 +84,7 @@ impl LinkDAO {
     pub async fn delete(&self, id: &Uuid) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
-        let mut stmt = conn
-            .prepare("DELETE FROM link WHERE ID = ?1")
-            .map_err(DbError::from)?;
+        let mut stmt = conn.prepare("DELETE FROM link WHERE ID = ?1").map_err(DbError::from)?;
         let _ = stmt.execute([id.to_string()]).map_err(DbError::from)?;
 
         Ok(())
