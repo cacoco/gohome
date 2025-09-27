@@ -293,7 +293,7 @@ fn create_stats_table(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error
 }
 
 impl Db {
-    pub fn default() -> Result<Self, rusqlite::Error> {
+    pub fn in_memory() -> Result<Self, rusqlite::Error> {
         let connection = rusqlite::Connection::open_in_memory()?;
         Self::new(connection)
     }

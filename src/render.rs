@@ -36,7 +36,7 @@ impl warp::Reply for Message {
     }
 }
 
-handlebars::handlebars_helper!(encode: |query: String| urlencoding::encode(&query).to_owned());
+handlebars::handlebars_helper!(encode: |query: String| urlencoding::encode(&query).clone());
 handlebars::handlebars_helper!(trim_suffix: |path: String, suffix: String| {
     match path.strip_suffix(&suffix) {
         Some(result) => result,
@@ -79,8 +79,8 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn default() -> Self {
-        Self::new("go", db::Db::default().unwrap(), Handlebars::new())
+    pub fn empty() -> Self {
+        Self::new("go", db::Db::in_memory().unwrap(), Handlebars::new())
     }
 
     pub fn new(host: &str, db: db::Db, handlebars: handlebars::Handlebars<'static>) -> Self {
@@ -90,7 +90,7 @@ impl Renderer {
 
         let mut nonce = [0u8; 64];
         rand::rng().fill_bytes(&mut nonce);
-        let csrf_token: csrf::CsrfToken = protect.generate_token(&mut nonce).unwrap();
+        let csrf_token: csrf::CsrfToken = protect.generate_token(&nonce).unwrap();
 
         let mut bars = handlebars.clone();
         bars.register_helper("encode", Box::new(encode));
@@ -489,7 +489,7 @@ mod tests {
 
     #[test]
     fn test_encode() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link(
                 "",
@@ -502,7 +502,7 @@ mod tests {
 
     #[test]
     fn test_encode_1() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link(
                 "Tolstoy",
@@ -515,7 +515,7 @@ mod tests {
 
     #[test]
     fn test_encode_2() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link(
                 "Foo Bar baz",
@@ -532,7 +532,7 @@ mod tests {
         query_params.insert("a".to_string(), "1".to_string());
         query_params.insert("bb".to_string(), "2".to_string());
 
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link(
                 "Foo Bar baz",
@@ -555,7 +555,7 @@ mod tests {
 
     #[test]
     fn test_path() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .handlebars
             .render_template(
@@ -568,7 +568,7 @@ mod tests {
 
     #[test]
     fn test_path_escape() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .handlebars
             .render_template(
@@ -581,7 +581,7 @@ mod tests {
 
     #[test]
     fn test_to_lower() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .handlebars
             .render_template(
@@ -594,7 +594,7 @@ mod tests {
 
     #[test]
     fn test_to_upper() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("samiam", HashMap::new(), "{{#if path}}{{uppercase path}}{{/if}}")
             .unwrap();
@@ -603,7 +603,7 @@ mod tests {
 
     #[test]
     fn test_trim_suffix() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("a/", HashMap::new(), "{{#if path}}{{trimsuffix path '/'}}{{/if}}")
             .unwrap();
@@ -612,7 +612,7 @@ mod tests {
 
     #[test]
     fn test_trim_suffix_1() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("hello, world", HashMap::new(), "{{trimsuffix path ', world'}}")
             .unwrap();
@@ -621,7 +621,7 @@ mod tests {
 
     #[test]
     fn test_trim_suffix_2() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("", HashMap::new(), "{{#if path}}{{trimsuffix path '/'}}{{/if}}")
             .unwrap();
@@ -630,7 +630,7 @@ mod tests {
 
     #[test]
     fn test_prefix() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("OOOa", HashMap::new(), "{{#if path}}{{trimprefix path 'OOO'}}{{/if}}")
             .unwrap();
@@ -639,7 +639,7 @@ mod tests {
 
     #[test]
     fn test_prefix_1() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("hello, world", HashMap::new(), "{{trimprefix path 'hello, '}}")
             .unwrap();
@@ -648,7 +648,7 @@ mod tests {
 
     #[test]
     fn test_prefix_2() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("", HashMap::new(), "{{#if path}}{{trimprefix path '/'}}{{/if}}")
             .unwrap();
@@ -657,7 +657,7 @@ mod tests {
 
     #[test]
     fn test_now_with_path() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer.expand_link("foobar", HashMap::new(), "{{ now }}").unwrap();
         assert!(!res.is_empty());
         // res should just be the date -- no path in template
@@ -667,7 +667,7 @@ mod tests {
 
     #[test]
     fn test_now_no_path() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer.expand_link("", HashMap::new(), "{{ now }}").unwrap();
         assert!(!res.is_empty());
         // res should just be the date -- no path in template
@@ -677,7 +677,7 @@ mod tests {
 
     #[test]
     fn test_match() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link(
                 "123",
@@ -690,7 +690,7 @@ mod tests {
 
     #[test]
     fn test_match_1() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link(
                 "foo",
@@ -703,7 +703,7 @@ mod tests {
 
     #[test]
     fn test_no_mangle_escapes() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("", HashMap::new(), "http://host.com/foo%2f/bar")
             .unwrap();
@@ -712,7 +712,7 @@ mod tests {
 
     #[test]
     fn test_no_mangle_escapes_with_path() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("extra", HashMap::new(), "http://host.com/foo%2f/bar")
             .unwrap();
@@ -721,7 +721,7 @@ mod tests {
 
     #[test]
     fn test_remainder() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("extra", HashMap::new(), "http://host.com/foo")
             .unwrap();
@@ -730,7 +730,7 @@ mod tests {
 
     #[test]
     fn test_remainder_with_slash() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("extra", HashMap::new(), "http://host.com/foo/")
             .unwrap();
@@ -739,7 +739,7 @@ mod tests {
 
     #[test]
     fn test_now_format() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link(
                 "",
@@ -754,7 +754,7 @@ mod tests {
 
     #[test]
     fn test_undefined_field() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("bar", HashMap::new(), "http://host.com/{{ bar }}")
             .unwrap();
@@ -763,7 +763,7 @@ mod tests {
 
     #[test]
     fn test_defined_field() {
-        let renderer = Renderer::default();
+        let renderer = Renderer::empty();
         let res = renderer
             .expand_link("bar", HashMap::new(), "http://host.com/{{path}}")
             .unwrap();
