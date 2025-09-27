@@ -10,7 +10,7 @@ use crate::{CreateUpdateRequest, render::Renderer};
 // cannot set this header, per the [Fetch Spec].
 //
 // [Fetch Spec]: https://fetch.spec.whatwg.org
-const SEC_HEADER_NAME: &'static str = "Sec-Golink";
+const SEC_HEADER_NAME: &str = "Sec-Golink";
 
 fn with_renderer(handlers: Renderer) -> impl Filter<Extract = (Renderer,), Error = Infallible> + Clone {
     warp::any().map(move || handlers.clone())

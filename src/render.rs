@@ -16,7 +16,7 @@ use crate::{
     model::{self, PopularLink},
 };
 
-const PARENT_PARTIAL: &'static str = "base";
+const PARENT_PARTIAL: &str = "base";
 
 struct Message {
     msg: String,
@@ -32,7 +32,7 @@ impl Message {
 
 impl warp::Reply for Message {
     fn into_response(self) -> warp::reply::Response {
-        warp::reply::Response::new(format!("{}", self.msg).into())
+        warp::reply::Response::new(self.msg.to_string().into())
     }
 }
 
@@ -105,7 +105,7 @@ impl Renderer {
         Self {
             host: host.to_string(),
             csrf_token,
-            db: db,
+            db,
             handlebars: bars,
         }
     }
@@ -160,7 +160,7 @@ impl Renderer {
     }
 
     pub async fn detail(&self, short: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        match self.db.link.get(&short).await {
+        match self.db.link.get(short).await {
             Ok(link) => {
                 match self.handlebars.render(
                     "detail",
@@ -266,8 +266,8 @@ impl Renderer {
         }
 
         let links = self.db.link.get_all().await.unwrap();
-        let id_list: Vec<Uuid> = links.iter().map(|l| l.id.clone()).collect();
-        if !id_list.contains(&id) {
+        let id_list: Vec<Uuid> = links.iter().map(|l| l.id).collect();
+        if !id_list.contains(id) {
             return redirect(&format!("/.detail/{}", id));
         }
 
@@ -301,8 +301,8 @@ impl Renderer {
         }
 
         let links = self.db.link.get_all().await.unwrap();
-        let id_list: Vec<Uuid> = links.iter().map(|l| l.id.clone()).collect();
-        if !id_list.contains(&id) {
+        let id_list: Vec<Uuid> = links.iter().map(|l| l.id).collect();
+        if !id_list.contains(id) {
             return redirect("/");
         }
 
@@ -396,7 +396,7 @@ impl Renderer {
     }
 
     pub async fn json_detail(&self, short: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        match self.db.link.get(&short).await {
+        match self.db.link.get(short).await {
             Ok(link) => match self.db.stats.get(&link.id).await {
                 Ok(stats) => {
                     let details = model::LinkDetails {
