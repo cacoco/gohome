@@ -14,13 +14,16 @@ async fn test_handlers() -> Result<(), Box<dyn std::error::Error + 'static>> {
 
     let mut handlebars = handlebars::Handlebars::new();
     // configure handlerbars
+    handlebars.register_template_file("all", "./templates/all.hbs").unwrap();
     handlebars
         .register_template_file("base", "./templates/base.hbs")
         .unwrap();
+    handlebars.register_template_file("detail", "./templates/detail.hbs").unwrap();
+    handlebars.register_template_file("help", "./templates/help.hbs").unwrap();
     handlebars
         .register_template_file("home", "./templates/home.hbs")
         .unwrap();
-    handlebars.register_template_file("all", "./templates/all.hbs").unwrap();
+    
     let renderer = Renderer::new("go", db.clone(), handlebars);
 
     let create_request = CreateUpdateRequest {
