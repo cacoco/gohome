@@ -5,7 +5,7 @@ use uuid::Uuid;
 /// Link is the structure stored for each go short link.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Link {
-    pub id: Uuid,    
+    pub id: Uuid,
     pub short: String, // the user-provided "foo" part of "http://go/foo"
     pub long: String,  // the target URL or text/template pattern to run
     pub created: chrono::DateTime<Utc>,
@@ -30,9 +30,20 @@ pub struct ClickStats {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Popular {
-    pub id: String,     // normalized short key Id
-    pub short: String,  // the user-provided "foo" part of "http://go/foo"
+pub struct PopularLink {
+    pub id: String,    // normalized short key Id
+    pub short: String, // the user-provided "foo" part of "http://go/foo"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clicks: Option<i32>, // number of times link has been clicked
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct LinkDetails {
+    pub id: Uuid,
+    pub short: String, // the user-provided "foo" part of "http://go/foo"
+    pub long: String,  // the target URL or text/template pattern to run
+    pub created: chrono::DateTime<Utc>,
+    pub updated: chrono::DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clicks: Option<i32>, // number of times link has been clicked
 }

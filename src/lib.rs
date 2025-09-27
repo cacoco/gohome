@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub mod db;
-pub mod render;
 pub mod model;
+pub mod render;
 pub mod routes;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

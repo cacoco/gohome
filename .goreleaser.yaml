@@ -43,16 +43,17 @@ checksum:
 
 dockers:
   - image_templates:
-      - "ghcr.io/cacoco/gohome:{{ .Tag }}"
-      - "ghcr.io/cacoco/gohome:latest"
+      - "ghcr.io/angstromio/gohome:{{ .Tag }}"
+      - "ghcr.io/angstromio/gohome:latest"
     dockerfile: Dockerfile
     extra_files:
       - entrypoint.sh
+      - static/base.css
+      - templates/all.hbs
       - templates/base.hbs
       - templates/detail.hbs
+      - templates/help.hbs
       - templates/home.hbs
-      - templates/all.hbs
-      - static/base.css
 
 docker_signs:
   - cmd: cosign
@@ -64,7 +65,7 @@ docker_signs:
 
 milestones:
   - repo:
-      owner: cacoco
+      owner: angstromio
       name: gohome
     close: true
     fail_on_error: false
@@ -72,7 +73,7 @@ milestones:
 
 release:
   github:
-    owner: cacoco
+    owner: angstromio
     name: gohome
   mode: replace
   footer: >-

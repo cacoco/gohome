@@ -1,0 +1,138 @@
+{{#*inline "main"}}
+<article class="prose max-w-5xl">
+<p>
+{{go}} links provide short, memorable links for the websites you and your team use most.
+
+<h2>Creating {{go}} links</h2>
+
+<p>
+All {{go}} links have a <strong>short name</strong> and a <strong>destination link</strong> that the {{go}} link points to.
+Some notes on short names:
+
+<ul>
+  <li>names must start with a letter or number
+  <li>names may contain letters, numbers, hyphens, and periods
+  <li>names are <strong>not</strong> case-sensitive ({{go}}/foo is the same as {{go}}/FOO)
+  <li>hyphens are ignored when resolving links ({{go}}/meetingnotes is the same as {{go}}/meeting-notes)
+</ul>
+
+<p>
+In simple cases, the destination link is an absolute URL, such as <strong>https://www.google.com/</strong>.
+
+<!-- example non-functional form -->
+<div class="flex flex-wrap mx-4">
+  <div class="flex">
+    <label class="flex my-2 px-2 items-center bg-gray-100 border border-r-0 border-gray-300 rounded-l-md text-gray-700">http://{{go}}/</label>
+    <input disabled type=text size=15 value="search" class="p-2 my-2 rounded-r-md border-gray-300">
+    <span class="flex m-2 items-center">&rarr;</span>
+  </div>
+  <input disabled type=text size=30 value="https://www.google.com/" class="p-2 my-2 mr-2 max-w-full rounded-md border-gray-300">
+  <button disabled type=submit class="py-2 px-4 my-2 rounded-md bg-blue-500 border-blue-500 text-white hover:bg-blue-600 hover:border-blue-600">Create</button>
+</div>
+
+<h2>Resolving links</h2>
+
+<p>
+Any additional path provided after the short name will be added to the end of the destination link.
+For example, if <strong>{{go}}/who</strong> goes to your company directory at <strong>http://directory/</strong>,
+then <strong>{{go}}/who/amelie</strong> will go to <strong>http://directory/amelie</strong>.
+
+<p>
+<a href="#advanced">Advanced destination links</a> allow you to further customize this behavior.
+
+<h2 id="advanced">Advanced destination links</h2>
+
+<p>
+To have more control over how {{go}} links are resolved, destination links can use <a href="https://handlebarsjs.com/">Handlebars</a> templating via <a href="https://github.com/sunng87/handlebars-rust/tree/master">handlebars-rust</a>.
+Templates are provided a data structure with the following field:
+
+<ul>
+  <li><code>path</code> is the remaining path value after the short name (without a leading slash).
+    For the link <strong>{{go}}/who/amelie</strong>, the value of <code>path</code> is <code>amelie</code>.
+</ul>
+
+Templates also have access to the following template functions:
+
+<ul>
+  <li><code>encode</code> is the <a href="https://docs.rs/urlencoding/latest/urlencoding/fn.encode.html">urlencoding::encode</a> function for percent-encoding every byte except alphanumerics and `-`, `_`, `.`, `~`. Assumes UTF-8 encoding.
+  <li><code>trim_prefix</code> is the <a href="https://doc.rust-lang.org/std/primitive.str.html#method.trim_prefix">str.trim_prefix</a> function for removing a leading prefix.
+  <li><code>trim_suffix</code> is the <a href="https://doc.rust-lang.org/std/primitive.str.html#method.trim_suffix">str.trim_suffix</a> function for removing a trailing suffix.
+  <li><code>lowercase</code> is the <a href="https://doc.rust-lang.org/std/primitive.str.html#method.to_lowercase">str.to_lowercase()</a> function for mapping all Unicode letters to their lower case.
+  <li><code>uppercase</code> is the <a href="https://doc.rust-lang.org/std/primitive.str.html#method.to_uppercase">str.to_uppercase()</a> function for mapping all Unicode letters to their upper case.
+  <li><code>match_string</code> is the <a href="https://docs.rs/regex/latest/regex/struct.Regex.html#method.is_match">regex::Regex.is_match</a> function for matching a regular expression pattern.
+  <li><code>now_format</code> is the <a href="https://docs.rs/chrono/latest/chrono/struct.DateTime.html#method.format">Utc::now().format()</a> function for formatting `Utc::now()` by the given format.
+  <li><code>date_format</code> is the <a href="https://docs.rs/chrono/latest/chrono/struct.DateTime.html#method.format">DateTime<Utc>.format()</a> function for formatting the given `DateTime<Utc>` by the given format.
+</ul>
+
+<p>
+The most common use of advanced destination links is to put the additional path in a custom location in the destination link.
+For example, you might set the destination for <strong>{{go}}/search</strong> to:
+
+<pre>https://www.google.com/&lbrace;&lbrace;#if path&rbrace;&rbrace;search?q=&lbrace;&lbrace;encode path&rbrace;&rbrace;&lbrace;&lbrace;/if&rbrace;&rbrace;</pre>
+
+When a user visits <strong>{{go}}/search</strong> with no additional path, they will be directed to <a href="https://www.google.com/">https://www.google.com/</a>.
+If they include an additional path like <strong>{{go}}/search/pangolins</strong>, they will be directed to <a href="https://www.google.com/search?q=pangolins">https://www.google.com/search?q=pangolins</a>.
+
+<h3>Examples</h3>
+
+<div class="overflow-auto">
+  <table>
+    <tr>
+      <td>Include path in query</td>
+      <td>{{go}}/search</td>
+      <td>https://cloudsearch.google.com/&lbrace;&lbrace;#if path&rbrace;&rbrace;cloudsearch/search?q=&lbrace;&lbrace;encode path&rbrace;&rbrace;&lbrace;&lbrace;/if&rbrace;&rbrace;</td>
+    </tr>
+    <tr>
+      <td>Include path in destination path</td>
+      <td>{{go}}/slack</td>
+      <td>https://company.slack.com/&lbrace;&lbrace;#if path&rbrace;&rbrace;channels/&lbrace;&lbrace;encode path&rbrace;&rbrace;&lbrace;&lbrace;/if&rbrace;&rbrace;</td>
+    </tr>
+    <tr>
+      <td>Include path in hostname</td>
+      <td>{{go}}/varz</td>
+      <td>http://&lbrace;&lbrace;#if path&rbrace;&rbrace;&lbrace;&lbrace;path&rbrace;&rbrace;&lbrace;&lbrace;else&rbrace;&rbrace;host&lbrace;&lbrace;/if&rbrace;&rbrace;.example/debug/varz</td>
+    </tr>
+    <tr>
+      <td>Include today's date in wiki page</td>
+      <td>{{go}}/today</td>
+      <td>http://wiki/&lbrace;&lbrace;now_format "%d/%m/%Y"&rbrace;&rbrace;</td>
+    </tr>
+  </table>
+</div>
+
+<p>
+There is no formal API, but many endpoints lend themselves to programmatic access.
+
+<p>
+Include a "+" after a link to get information about a link without resolving it:
+
+<pre>$ curl -L {{go}}/search+
+{
+  "id": "e5f76cc2-703d-86fc-b8c5-8c47003290e8",
+  "short": "search",
+  "long": "https://cloudsearch.google.com/&lbrace;&lbrace;#if path&rbrace;&rbrace;cloudsearch/search?q=&lbrace;&lbrace;encode path&rbrace;&rbrace;&lbrace;&lbrace;/if&rbrace;&rbrace;",
+  "created": "2022-06-08T04:27:32.829906577Z",
+  "updated": "2022-06-13T04:42:08.396702416Z",
+  "clicks": 8
+}
+</pre>
+
+<p>
+Visit <a href="/.export">{{go}}/.export</a> to export all saved links and their metadata in <a href="https://github.com/ndjson/ndjson-spec">NDJSON Newline delimited JSON</a> with <pre>Content-Type: application/x-ndjson</pre>
+This is useful to create data snapshots that can be restored later.
+
+<pre>$ curl -L {{go}}/.export
+{"id":"ffc0918e-61ca-4d10-b762-4c5a5ac9e584","short":"go","long":"http://go","created":"2022-05-31T13:04:44.741457796-07:00","updated":"2022-05-31T13:04:44.741457796-07:00","clicks":1}
+{"id":"bc63f728-2ce5-41d2-ab29-7af7f98d9e7f","short":"slack","long":"https://company.slack.com/&lbrace;&lbrace;#if path&rbrace;&rbrace;channels/&lbrace;&lbrace;encode path&rbrace;&rbrace;&lbrace;&lbrace;end&rbrace;&rbrace;","created":"2022-06-17T18:05:43.562948451Z","updated":"2022-06-17T18:06:35.811398Z","clicks":4}
+</pre>
+
+<p>
+Create a new link by sending a POST request with a <code>short</code> and <code>long</code> value:
+
+<pre>$ curl -X POST -H 'Sec-Golink: 1' -d 'short=cs&long=https://cs.github.com/' -w "\n" http://{{go}}/
+{"id":"2190f187-a1ed-45e3-a72b-580cd3e5a8ed","short":"cs","long":"https://cs.github.com/","created":"2025-09-27T18:09:51.511082722Z","updated":"2025-09-27T18:09:51.511153055Z"}
+</pre>
+
+</article>
+{{/inline}}
+{{> (lookup this "parent")}}

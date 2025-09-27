@@ -11,13 +11,15 @@ shadow!(build);
 #[derive(Parser, Debug)]
 #[command(version = build::VERSION, long_version = build::CLAP_LONG_VERSION, about = "", long_about = "")]
 struct Args {
-    #[arg(long, help = "", default_value = "127.0.0.1:3030")]
+    #[arg(long, env = "DOMAIN", default_value = "go")]
+    domain: String,
+    #[arg(long, env = "HOST", default_value = "127.0.0.1:3030")]
     host: SocketAddr,
-    #[arg(long, help = "", default_value = "/home/nonroot")]
+    #[arg(long, default_value = "/home/nonroot")]
     sqlite_path: String,
-    #[arg(long, help = "", default_value = "/usr/src/templates")]
+    #[arg(long, default_value = "/usr/src/templates")]
     templates_dir: String,
-    #[arg(long, help = "", default_value = "/usr/src/assets")]
+    #[arg(long, default_value = "/usr/src/assets")]
     assets_dir: String,
 }
 
@@ -42,12 +44,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // templating config
     let mut handlebars = Handlebars::new();
-    handlebars.register_template_file("base", format!("{}/base.hbs", args.templates_dir)).unwrap();
-    handlebars.register_template_file("detail", format!("{}/detail.hbs", args.templates_dir)).unwrap();
-    handlebars.register_template_file("home", format!("{}/home.hbs", args.templates_dir)).unwrap();
-    handlebars.register_template_file("all", format!("{}/all.hbs", args.templates_dir)).unwrap();
-    
-    let renderer = Renderer::new(db, handlebars);
+    handlebars
+        .register_template_file("all", format!("{}/all.hbs", args.templates_dir))
+        .unwrap();
+    handlebars
+        .register_template_file("base", format!("{}/base.hbs", args.templates_dir))
+        .unwrap();
+    handlebars
+        .register_template_file("detail", format!("{}/detail.hbs", args.templates_dir))
+        .unwrap();
+    handlebars
+        .register_template_file("help", format!("{}/help.hbs", args.templates_dir))
+        .unwrap();
+    handlebars
+        .register_template_file("home", format!("{}/home.hbs", args.templates_dir))
+        .unwrap();
+
+    let renderer = Renderer::new(&args.domain, db, handlebars);
     let routes = gohome::routes::get_routes(renderer, args.assets_dir);
 
     tracing::info!("starting warp server: {}", &args.host);
