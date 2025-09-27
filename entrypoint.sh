@@ -19,7 +19,7 @@ cleanup() {
 }
 
 main() {
-    RUST_LOG=debug /usr/src/${BINARY_NAME//-/_} "$@" &
+    RUST_LOG=${RUST_LOG:-info} RUST_BACKTRACE="full" /usr/src/${BINARY_NAME//-/_} "$@" &
     BINARY_PID=$!
 
     # keep the script running while the binary is active

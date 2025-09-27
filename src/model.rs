@@ -1,25 +1,21 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// Link is the structure stored for each go short link.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Link {
-    pub id: String,    // normalized short key Id
+    pub id: Uuid,    
     pub short: String, // the user-provided "foo" part of "http://go/foo"
     pub long: String,  // the target URL or text/template pattern to run
     pub created: chrono::DateTime<Utc>,
     pub updated: chrono::DateTime<Utc>,
-    pub owner: Option<String>,
 }
 
 impl std::fmt::Display for Link {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: ", self.id)?;
         write!(f, "go/{} -> {}", self.short, self.long)?;
-        // If an owner exists, append it to the string.
-        if let Some(owner) = &self.owner {
-            write!(f, " (owner: {})", owner)?;
-        }
         write!(f, " [created: {}, updated: {}]", self.created, self.updated)?;
         Ok(())
     }
@@ -27,8 +23,17 @@ impl std::fmt::Display for Link {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ClickStats {
-    pub id: String, // normalized short key Id
+    pub id: Uuid, // normalized short key Id
     pub created: chrono::DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clicks: Option<i32>, // number of times link has been clicked
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Popular {
+    pub id: String,     // normalized short key Id
+    pub short: String,  // the user-provided "foo" part of "http://go/foo"
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub clicks: Option<i32>, // number of times link has been clicked
 }
 

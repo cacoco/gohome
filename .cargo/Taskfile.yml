@@ -26,6 +26,7 @@ tasks:
     cmds:
       - 'cargo clean'
       - 'rm -fr dist/'
+      - 'rm -f gohome.db'
     sources:
       - '**/*.rs'
       - 'Cargo.toml'

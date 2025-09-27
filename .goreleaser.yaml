@@ -48,6 +48,11 @@ dockers:
     dockerfile: Dockerfile
     extra_files:
       - entrypoint.sh
+      - templates/base.hbs
+      - templates/detail.hbs
+      - templates/home.hbs
+      - templates/all.hbs
+      - static/base.css
 
 docker_signs:
   - cmd: cosign

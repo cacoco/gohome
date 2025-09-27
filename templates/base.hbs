@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>{{go}}/</title>
+  <link rel="stylesheet" href="/assets/base.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="https://angstrom.io/images/angstromio24.png">
+</head>
+<body class="flex flex-col min-h-screen">
+  <div class="bg-gray-100 border-b border-gray-200 pt-4 pb-2 mb-6">
+    <header class="container mx-auto px-4">
+      <h1 class="text-2xl font-bold pb-1"><a href="/">{{go}}/</a></h1>
+      A private shortlink service for your home network
+    </header>
+  </div>
+
+  <main class="container mx-auto px-4 flex-1">
+    {{> main}}
+  </main>
+  <footer class="bg-gray-100 border-t border-gray-200 pt-2 pb-2 mt-6">
+    <div class="container mx-auto px-4 leading-6 text-right">
+      Inspired by Tailscale: <a href="https://github.com/tailscale/golink">github.com/tailscale/golink</a>&nbsp;written by <a href="https://angstrom.io">angstrom.io</a>
+      <a href="https://angstrom.io/" class="inline-block align-text-top">
+      <image src="https://angstrom.io/images/angstromio24.png"/>
+      </a>
+    </div>
+  </footer>
+</html>

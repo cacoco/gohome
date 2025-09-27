@@ -75,21 +75,11 @@ main() {
             printf "syft is required to run ❌\nPlease install syft: \"brew install syft\"\n" >&2
             exit 1
         fi
-        # # check if docker-compose installed
-        # command_to_check="docker-compose"
-        # printf "Checking if docker-compose is installed..."
-        # if command -v "$command_to_check" > /dev/null 2>&1; then
-        #     printf "docker-compose is installed ✅ \n"
-        # else
-        #     printf "docker-compose is required to run ❌\nPlease install docker-compose: \"brew install docker-compose\"\n" >&2
-        #     exit 1
-        # fi
-        # echo ""
         goreleaser release --snapshot --clean
     fi
 
     base=$(pwd)
-    docker run -v "$base:/home/nonroot" -p 8080:8080 -e "RUST_LOG=true" ghcr.io/cacoco/gohome:latest --host="0.0.0.0:8080"
+    docker run -v "$base:/home/nonroot" -p 8080:8080 -e "RUST_LOG=trace" ghcr.io/cacoco/gohome:latest --host="0.0.0.0:8080"
 }
 
 main "$@"

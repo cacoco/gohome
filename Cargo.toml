@@ -11,7 +11,7 @@ chrono = { version = "0.4.41", features = ["serde"] }
 clap = { version = "4.5.45", features = ["derive", "env"] }
 csrf = "0.5.0"
 dotenvy = "0.15.7"
-handlebars = "6.3.2"
+handlebars = { version = "6.3.2", features = ["dir_source"] }
 http-body-util = "0.1.3"
 hyper = "1.7.0"
 maud = { version = "0.27.0", features = ["warp"] }
@@ -22,12 +22,14 @@ regex = "1.11.2"
 rusqlite = { version = "0.37.0", features = ["bundled", "chrono", "serde_json"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.142"
+serde-jsonlines = "0.7.0"
 shadow-rs = { version = "1.2.1", features = ["metadata"] }
 tokio = { version = "1.47.1", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 url = "2.5.7"
 urlencoding = "2.1.3"
+uuid = { version = "1.18.1", features = ["serde", "v4"] }
 warp = { version = "0.4.1", features = ["server"] }
 
 [build-dependencies]
