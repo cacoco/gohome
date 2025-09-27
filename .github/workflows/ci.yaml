@@ -14,7 +14,6 @@ env:
 jobs:
     rustfmt:
         if: ${{ github.event_name == 'pull_request' }}
-        timeout-minutes: 5
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -29,7 +28,6 @@ jobs:
                 token: ${{ secrets.GITHUB_TOKEN }}
                 mode: review
     test:
-        timeout-minutes: 3
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v5

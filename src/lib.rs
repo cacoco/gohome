@@ -12,12 +12,12 @@ pub struct CreateUpdateRequest {
     pub target: String,
 }
 
-impl Into<model::Link> for CreateUpdateRequest {
-    fn into(self) -> model::Link {
+impl From<CreateUpdateRequest> for model::Link {
+    fn from(val: CreateUpdateRequest) -> Self {
         model::Link {
             id: Uuid::new_v4(),
-            short: self.short.clone(),
-            long: self.target.clone(),
+            short: val.short.clone(),
+            long: val.target.clone(),
             created: chrono::Utc::now(),
             updated: chrono::Utc::now(),
         }

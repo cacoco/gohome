@@ -3,14 +3,14 @@ use std::{collections::HashMap, convert::Infallible};
 use uuid::Uuid;
 use warp::{Filter, filters::path::FullPath};
 
-use crate::{render::Renderer, CreateUpdateRequest};
+use crate::{CreateUpdateRequest, render::Renderer};
 
 // If the caller sends this header set to a non-empty value, we will allow
 // them to make the call even without an XSRF token. JavaScript in browser
 // cannot set this header, per the [Fetch Spec].
 //
 // [Fetch Spec]: https://fetch.spec.whatwg.org
-const SEC_HEADER_NAME: &'static str = "Sec-Golink";
+const SEC_HEADER_NAME: &str = "Sec-Golink";
 
 fn with_renderer(handlers: Renderer) -> impl Filter<Extract = (Renderer,), Error = Infallible> + Clone {
     warp::any().map(move || handlers.clone())
@@ -124,31 +124,32 @@ fn post(renderer: Renderer) -> impl Filter<Extract = impl warp::Reply, Error = w
         .and(warp::body::form())
         .and(warp::header::<String>(SEC_HEADER_NAME))
         .and(with_renderer(renderer))
-        .and_then(|form_data: HashMap<String, String>, sec_header_value: String, renderer: Renderer| async move {
-            if sec_header_value.is_empty() {
-                renderer.bad_request().await
-            } else {
-                let request = CreateUpdateRequest {
-                    short: form_data.get("short").unwrap().to_string(),
-                    target: form_data.get("long").unwrap().to_string(),
-                };
-                renderer.new_link(request).await
-            }
-        })
+        .and_then(
+            |form_data: HashMap<String, String>, sec_header_value: String, renderer: Renderer| async move {
+                if sec_header_value.is_empty() {
+                    renderer.bad_request().await
+                } else {
+                    let request = CreateUpdateRequest {
+                        short: form_data.get("short").unwrap().to_string(),
+                        target: form_data.get("long").unwrap().to_string(),
+                    };
+                    renderer.new_link(request).await
+                }
+            },
+        )
 }
 
 pub fn get_routes(
     renderer: Renderer,
     static_assets: String,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    let api_routes = 
-        post(renderer.clone())
+    let api_routes = post(renderer.clone())
         .or(detail(renderer.clone()))
         .or(all(renderer.clone()))
         .or(help(renderer.clone()))
         .or(export(renderer.clone()))
         .or(get(renderer.clone()))
-        .or(home(renderer.clone()))       
+        .or(home(renderer.clone()))
         .or(create(renderer.clone()))
         .or(update(renderer.clone()))
         .or(delete(renderer.clone()));

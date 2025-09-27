@@ -58,13 +58,13 @@ impl LinkDAO {
             r#"INSERT INTO link (ID, short, long, created, updated) values (?1, ?2, ?3, ?4, ?5)"#,
             params![link.id.to_string(), link.short, link.long, link.created, link.updated],
         )
-        .map_err(|e| DbError::from(e))?;
+        .map_err(DbError::from)?;
 
         conn.execute(
             r#"INSERT INTO stats (ID, created, clicks) values (?1, ?2, ?3)"#,
             params![link.id.to_string(), chrono::Utc::now(), rusqlite::types::Null],
         )
-        .map_err(|e| DbError::from(e))?;
+        .map_err(DbError::from)?;
 
         Ok(link.id)
     }
@@ -76,7 +76,7 @@ impl LinkDAO {
             r#"UPDATE link SET short = ?1, long = ?2, created = ?3, updated = ?4 WHERE ID = ?5"#,
             params![link.short, link.long, link.created, link.updated, link.id.to_string()],
         )
-        .map_err(|e| DbError::from(e))?;
+        .map_err(DbError::from)?;
 
         Ok(())
     }
@@ -84,10 +84,8 @@ impl LinkDAO {
     pub async fn delete(&self, id: &Uuid) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
-        let mut stmt = conn
-            .prepare("DELETE FROM link WHERE ID = ?1")
-            .map_err(|e| DbError::from(e))?;
-        let _ = stmt.execute([id.to_string()]).map_err(|e| DbError::from(e))?;
+        let mut stmt = conn.prepare("DELETE FROM link WHERE ID = ?1").map_err(DbError::from)?;
+        let _ = stmt.execute([id.to_string()]).map_err(DbError::from)?;
 
         Ok(())
     }
@@ -97,7 +95,7 @@ impl LinkDAO {
 
         let mut stmt = conn
             .prepare("SELECT ID, short, long, created, updated FROM link WHERE short = ?1")
-            .map_err(|e| DbError::from(e))?;
+            .map_err(DbError::from)?;
         stmt.query_one([short], |row| {
             let id_string: String = row.get(0)?;
             let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
@@ -117,12 +115,12 @@ impl LinkDAO {
 
         let mut stmt = conn
             .prepare("SELECT ID, short, long, created, updated FROM link WHERE ID = ?1")
-            .map_err(|e| DbError::from(e))?;
+            .map_err(DbError::from)?;
         stmt.query_one([id.to_string()], |row| {
             let id_string: String = row.get(0)?;
             let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
             Ok(model::Link {
-                id: id,
+                id,
                 short: row.get(1)?,
                 long: row.get(2)?,
                 created: row.get(3)?,
@@ -137,14 +135,14 @@ impl LinkDAO {
 
         let mut stmt: rusqlite::Statement<'_> = conn
             .prepare(r#"SELECT ID, short, long, created, updated FROM link"#)
-            .map_err(|e| DbError::from(e))?;
-        let rows = stmt.query([]).map_err(|e| DbError::from(e))?;
+            .map_err(DbError::from)?;
+        let rows = stmt.query([]).map_err(DbError::from)?;
         let results: Vec<model::Link> = rows
             .map(|row| {
                 let id_string: String = row.get(0)?;
                 let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
                 Ok(model::Link {
-                    id: id,
+                    id,
                     short: row.get(1)?,
                     long: row.get(2)?,
                     created: row.get(3)?,
@@ -168,23 +166,23 @@ impl LinkDAO {
         ORDER BY s.clicks DESC
         LIMIT 10"#,
             )
-            .map_err(|e| DbError::from(e))?;
+            .map_err(DbError::from)?;
 
-        let rows = stmt.query([]).map_err(|e| DbError::from(e))?;
+        let rows = stmt.query([]).map_err(DbError::from)?;
         let results: Vec<(model::Link, model::ClickStats)> = rows
             .map(|row| {
                 let id_string: String = row.get(0)?;
                 let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
                 Ok((
                     model::Link {
-                        id: id,
+                        id,
                         short: row.get(1)?,
                         long: row.get(2)?,
                         created: row.get(3)?,
                         updated: row.get(4)?,
                     },
                     model::ClickStats {
-                        id: id,
+                        id,
                         created: row.get(6)?,
                         clicks: row.get(7)?,
                     },
@@ -209,7 +207,7 @@ impl StatsDAO {
             r#"UPDATE stats SET clicks = IFNULL(clicks, 0) + 1 WHERE ID = ?1"#,
             [id.to_string()],
         )
-        .map_err(|e| DbError::from(e))?;
+        .map_err(DbError::from)?;
 
         Ok(())
     }
@@ -219,12 +217,12 @@ impl StatsDAO {
 
         let mut stmt: rusqlite::Statement<'_> = conn
             .prepare(r#"SELECT ID, created, clicks FROM stats WHERE ID = ?1"#)
-            .map_err(|e| DbError::from(e))?;
+            .map_err(DbError::from)?;
         match stmt.query_one([id.to_string()], |row| {
             let id_string: String = row.get(0)?;
             let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
             Ok(model::ClickStats {
-                id: id,
+                id,
                 created: row.get(1)?,
                 clicks: row.get(2)?,
             })
@@ -242,14 +240,14 @@ impl StatsDAO {
 
         let mut stmt: rusqlite::Statement<'_> = conn
             .prepare(r#"SELECT ID, created, clicks FROM stats"#)
-            .map_err(|e| DbError::from(e))?;
-        let rows = stmt.query([]).map_err(|e| DbError::from(e))?;
+            .map_err(DbError::from)?;
+        let rows = stmt.query([]).map_err(DbError::from)?;
         let results: Result<Vec<model::ClickStats>, rusqlite::Error> = rows
             .map(|row| {
                 let id_string: String = row.get(0)?;
                 let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
                 Ok(model::ClickStats {
-                    id: id,
+                    id,
                     created: row.get(1)?,
                     clicks: row.get(2)?,
                 })
@@ -293,7 +291,7 @@ fn create_stats_table(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error
 }
 
 impl Db {
-    pub fn default() -> Result<Self, rusqlite::Error> {
+    pub fn in_memory() -> Result<Self, rusqlite::Error> {
         let connection = rusqlite::Connection::open_in_memory()?;
         Self::new(connection)
     }
@@ -326,7 +324,7 @@ mod tests {
             id: Uuid::new_v4(),
             short: "nyt".to_string(),
             long: "https://nytimes.com".to_string(),
-            created: link_created.clone(),
+            created: link_created,
             updated: chrono::Utc::now(),
         };
 
@@ -350,13 +348,13 @@ mod tests {
 
         // Update
         let updated_link = model::Link {
-            id: result.clone(),
+            id: result,
             short: "nytimes".to_string(),
             long: "https://nytimes.com".to_string(),
-            created: link_created.clone(),
+            created: link_created,
             updated: chrono::Utc::now(),
         };
-        let _ = db.link.update(&updated_link).await?;
+        db.link.update(&updated_link).await?;
         let read_updated = db.link.get_by_id(&result).await?;
         assert_eq!(read_updated.short, updated_link.short);
 
