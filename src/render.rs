@@ -19,13 +19,13 @@ use crate::{
 const PARENT_PARTIAL: &'static str = "base";
 
 struct Message {
-    msg: String
+    msg: String,
 }
 
 impl Message {
     fn new(message: &str) -> Self {
         Self {
-            msg: message.to_string()
+            msg: message.to_string(),
         }
     }
 }
@@ -35,7 +35,6 @@ impl warp::Reply for Message {
         warp::reply::Response::new(format!("{}", self.msg).into())
     }
 }
-
 
 handlebars::handlebars_helper!(encode: |query: String| urlencoding::encode(&query).to_owned());
 handlebars::handlebars_helper!(trim_suffix: |path: String, suffix: String| {
@@ -117,7 +116,11 @@ impl Renderer {
 }
 
 fn redirect(location: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-    Ok(Box::new(warp::reply::with_header(warp::redirect(location.parse::<warp::http::Uri>().unwrap()), "Cache-Control", "no-cache")))
+    Ok(Box::new(warp::reply::with_header(
+        warp::redirect(location.parse::<warp::http::Uri>().unwrap()),
+        "Cache-Control",
+        "no-cache",
+    )))
 }
 
 fn response(message: &str, status: warp::http::StatusCode) -> Result<Box<dyn warp::Reply>, Infallible> {
@@ -196,7 +199,7 @@ impl Renderer {
                 redirect("/.all")
             }
         }
-    } 
+    }
 
     pub async fn create(&self, request: CreateUpdateRequest, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
         if xsrf != self.xsrf() {
@@ -212,15 +215,11 @@ impl Renderer {
 
         let link: model::Link = request.into();
         match self.db.link.insert(&link).await {
-            Ok(id) => {
-                match self.db.link.get_by_id(&id).await {
-                    Ok(_) => {
-                        redirect("/")
-                    }
-                    Err(e) => {
-                        tracing::error!("{e}");
-                        redirect("/")
-                    }
+            Ok(id) => match self.db.link.get_by_id(&id).await {
+                Ok(_) => redirect("/"),
+                Err(e) => {
+                    tracing::error!("{e}");
+                    redirect("/")
                 }
             },
             Err(e) => {
@@ -234,20 +233,19 @@ impl Renderer {
         let links: Vec<model::Link> = self.db.link.get_all().await.unwrap();
         for link in links.iter() {
             if request.short == link.short {
-                return response("Link with short code already exists", warp::http::StatusCode::BAD_REQUEST);
+                return response(
+                    "Link with short code already exists",
+                    warp::http::StatusCode::BAD_REQUEST,
+                );
             }
         }
         let link: model::Link = request.into();
         match self.db.link.insert(&link).await {
-            Ok(id) => {
-                match self.db.link.get_by_id(&id).await {
-                    Ok(link) => {
-                        Ok(Box::new(warp::reply::json(&link)))
-                    },
-                    Err(e) => {
-                        tracing::error!("{e}");
-                        response(&e.to_string(), warp::http::StatusCode::INTERNAL_SERVER_ERROR)
-                    }
+            Ok(id) => match self.db.link.get_by_id(&id).await {
+                Ok(link) => Ok(Box::new(warp::reply::json(&link))),
+                Err(e) => {
+                    tracing::error!("{e}");
+                    response(&e.to_string(), warp::http::StatusCode::INTERNAL_SERVER_ERROR)
                 }
             },
             Err(e) => {
@@ -283,9 +281,7 @@ impl Renderer {
                     updated: chrono::Utc::now(),
                 };
                 match self.db.link.update(&updated_link).await {
-                    Ok(()) => {
-                        redirect(&format!("/.detail/{}", id))
-                    }
+                    Ok(()) => redirect(&format!("/.detail/{}", id)),
                     Err(e) => {
                         tracing::error!("{e}");
                         redirect(&format!("/.detail/{}", id))
@@ -343,8 +339,7 @@ impl Renderer {
                 writer.flush().expect("Unable to flush writer");
                 let inner_buffer = writer.into_inner().unwrap();
                 let result_string = String::from_utf8(inner_buffer).expect("Buffer content was not valid UTF-8");
-                Ok(Box::new(
-                    warp::reply::with_status(
+                Ok(Box::new(warp::reply::with_status(
                     warp::reply::with_header(warp::reply::html(result_string), "Content-Type", "application/x-ndjson"),
                     warp::http::StatusCode::OK,
                 )))
@@ -374,13 +369,12 @@ impl Renderer {
                 match self.expand_link(&path, query_params, &link.long) {
                     Ok(location) => {
                         match self.db.stats.incr(&link.id).await {
-                            Ok(()) => {},
+                            Ok(()) => {}
                             Err(e) => {
                                 tracing::error!("{e}")
-                            },
+                            }
                         }
-                        Ok(Box::new(
-                            warp::reply::with_status(
+                        Ok(Box::new(warp::reply::with_status(
                             warp::redirect(location.parse::<warp::http::Uri>().unwrap()),
                             warp::http::StatusCode::PERMANENT_REDIRECT,
                         )))
@@ -432,11 +426,11 @@ impl Renderer {
             }
         }
     }
-    
+
     pub async fn bad_request(&self) -> Result<Box<dyn warp::Reply>, Infallible> {
         Ok(Box::new(warp::http::StatusCode::BAD_REQUEST))
     }
-    
+
     fn path_remainder(full_path: &str, short_slug: &str) -> String {
         match full_path.find(short_slug) {
             Some(start_index) => {
