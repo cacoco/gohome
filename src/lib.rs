@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 pub mod db;
 pub mod model;
@@ -15,7 +14,6 @@ pub struct CreateUpdateRequest {
 impl From<CreateUpdateRequest> for model::Link {
     fn from(val: CreateUpdateRequest) -> Self {
         model::Link {
-            id: Uuid::new_v4(),
             short: val.short.clone(),
             long: val.target.clone(),
             created: chrono::Utc::now(),

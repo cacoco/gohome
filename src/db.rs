@@ -3,7 +3,6 @@ use std::sync::Arc;
 use rusqlite::fallible_iterator::FallibleIterator;
 use rusqlite::params;
 use tokio::sync::Mutex;
-use uuid::Uuid;
 
 use crate::model;
 
@@ -51,102 +50,64 @@ impl LinkDAO {
         Self { connection }
     }
 
-    pub async fn insert(&self, link: &model::Link) -> Result<Uuid, Box<DbError>> {
+    pub async fn save(&self, link: &model::Link) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
         conn.execute(
-            r#"INSERT INTO link (ID, short, long, created, updated) values (?1, ?2, ?3, ?4, ?5)"#,
-            params![link.id.to_string(), link.short, link.long, link.created, link.updated],
+            r#"INSERT OR REPLACE INTO Links (ID, short, long, created, updated) values (?1, ?2, ?3, ?4, ?5)"#,
+            params![model::normalized_id(&link.short), link.short, link.long, link.created, link.updated],
         )
         .map_err(DbError::from)?;
 
         conn.execute(
-            r#"INSERT INTO stats (ID, created, clicks) values (?1, ?2, ?3)"#,
-            params![link.id.to_string(), chrono::Utc::now(), rusqlite::types::Null],
-        )
-        .map_err(DbError::from)?;
-
-        Ok(link.id)
-    }
-
-    pub async fn update(&self, link: &model::Link) -> Result<(), Box<DbError>> {
-        let conn = self.connection.lock().await;
-
-        conn.execute(
-            r#"UPDATE link SET short = ?1, long = ?2, created = ?3, updated = ?4 WHERE ID = ?5"#,
-            params![link.short, link.long, link.created, link.updated, link.id.to_string()],
+            r#"INSERT INTO Stats (ID, created, clicks) values (?1, ?2, ?3)"#,
+            params![model::normalized_id(&link.short), chrono::Utc::now(), rusqlite::types::Null],
         )
         .map_err(DbError::from)?;
 
         Ok(())
     }
 
-    pub async fn delete(&self, id: &Uuid) -> Result<(), Box<DbError>> {
+    pub async fn delete(&self, short: &str) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
-        let mut stmt = conn.prepare("DELETE FROM link WHERE ID = ?1").map_err(DbError::from)?;
-        let _ = stmt.execute([id.to_string()]).map_err(DbError::from)?;
+        let mut stmt = conn.prepare("DELETE FROM Links WHERE ID = ?1").map_err(DbError::from)?;
+        let _ = stmt.execute([model::normalized_id(short)]).map_err(DbError::from)?;
 
         Ok(())
     }
 
-    pub async fn get(&self, short: &str) -> Result<model::Link, Box<DbError>> {
+    pub async fn load(&self, short: &str) -> Result<model::Link, Box<DbError>> {
         let conn = self.connection.lock().await;
 
         let mut stmt = conn
-            .prepare("SELECT ID, short, long, created, updated FROM link WHERE short = ?1")
+            .prepare("SELECT short, long, created, updated FROM Links WHERE ID = ?1")
             .map_err(DbError::from)?;
-        stmt.query_one([short], |row| {
-            let id_string: String = row.get(0)?;
-            let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
+        stmt.query_one([model::normalized_id(short)], |row| {
             Ok(model::Link {
-                id,
-                short: row.get(1)?,
-                long: row.get(2)?,
-                created: row.get(3)?,
-                updated: row.get(4)?,
+                short: row.get(0)?,
+                long: row.get(1)?,
+                created: row.get(2)?,
+                updated: row.get(3)?,
             })
         })
         .map_err(|e| Box::new(DbError::from(e)))
     }
 
-    pub async fn get_by_id(&self, id: &Uuid) -> Result<model::Link, Box<DbError>> {
-        let conn = self.connection.lock().await;
-
-        let mut stmt = conn
-            .prepare("SELECT ID, short, long, created, updated FROM link WHERE ID = ?1")
-            .map_err(DbError::from)?;
-        stmt.query_one([id.to_string()], |row| {
-            let id_string: String = row.get(0)?;
-            let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
-            Ok(model::Link {
-                id,
-                short: row.get(1)?,
-                long: row.get(2)?,
-                created: row.get(3)?,
-                updated: row.get(4)?,
-            })
-        })
-        .map_err(|e| Box::new(DbError::from(e)))
-    }
-
-    pub async fn get_all(&self) -> Result<Vec<model::Link>, Box<DbError>> {
+    pub async fn load_all(&self) -> Result<Vec<model::Link>, Box<DbError>> {
         let conn = self.connection.lock().await;
 
         let mut stmt: rusqlite::Statement<'_> = conn
-            .prepare(r#"SELECT ID, short, long, created, updated FROM link"#)
+            .prepare(r#"SELECT short, long, created, updated FROM Links"#)
             .map_err(DbError::from)?;
         let rows = stmt.query([]).map_err(DbError::from)?;
         let results: Vec<model::Link> = rows
             .map(|row| {
-                let id_string: String = row.get(0)?;
-                let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
                 Ok(model::Link {
-                    id,
-                    short: row.get(1)?,
-                    long: row.get(2)?,
-                    created: row.get(3)?,
-                    updated: row.get(4)?,
+                    short: row.get(0)?,
+                    long: row.get(1)?,
+                    created: row.get(2)?,
+                    updated: row.get(3)?,
                 })
             })
             .collect()
@@ -161,8 +122,8 @@ impl LinkDAO {
         let mut stmt: rusqlite::Statement<'_> = conn
             .prepare(
                 r#"SELECT l.ID, l.short, l.long, l.created, l.updated, s.ID, s.created, s.clicks
-        FROM link l
-        INNER JOIN stats s ON s.ID = l.ID
+        FROM Links l
+        INNER JOIN Stats s ON s.ID = l.ID
         ORDER BY s.clicks DESC
         LIMIT 10"#,
             )
@@ -171,20 +132,16 @@ impl LinkDAO {
         let rows = stmt.query([]).map_err(DbError::from)?;
         let results: Vec<(model::Link, model::ClickStats)> = rows
             .map(|row| {
-                let id_string: String = row.get(0)?;
-                let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
                 Ok((
                     model::Link {
-                        id,
-                        short: row.get(1)?,
-                        long: row.get(2)?,
-                        created: row.get(3)?,
-                        updated: row.get(4)?,
+                        short: row.get(0)?,
+                        long: row.get(1)?,
+                        created: row.get(2)?,
+                        updated: row.get(3)?,
                     },
                     model::ClickStats {
-                        id,
-                        created: row.get(6)?,
-                        clicks: row.get(7)?,
+                        created: row.get(4)?,
+                        clicks: row.get(5)?,
                     },
                 ))
             })
@@ -204,11 +161,10 @@ impl StatsDAO {
         let conn = self.connection.lock().await;
 
         let rows_affected = conn.execute(
-            r#"UPDATE stats SET clicks = IFNULL(clicks, 0) + 1 WHERE stats.ID = (SELECT ID from link where short = ?1)"#,
-            [short],
+            r#"UPDATE Stats SET clicks = IFNULL(clicks, 0) + 1 WHERE stats.ID = ?1"#,
+            [model::normalized_id(short)],
         )
         .map_err(DbError::from)?;
-        // Check the number of rows affected instead of asserting
         if rows_affected == 0 {
             // The short link was not found, return a specific error
             return Err(Box::new(DbError::new(format!("Stats for link with short = {} not found", short))));
@@ -217,19 +173,16 @@ impl StatsDAO {
         Ok(())
     }
 
-    pub async fn get(&self, id: &Uuid) -> Result<Option<model::ClickStats>, Box<DbError>> {
+    pub async fn load(&self, short: &str) -> Result<Option<model::ClickStats>, Box<DbError>> {
         let conn = self.connection.lock().await;
 
         let mut stmt: rusqlite::Statement<'_> = conn
-            .prepare(r#"SELECT ID, created, clicks FROM stats WHERE ID = ?1"#)
+            .prepare(r#"SELECT created, clicks FROM Stats WHERE ID = ?1"#)
             .map_err(DbError::from)?;
-        match stmt.query_one([id.to_string()], |row| {
-            let id_string: String = row.get(0)?;
-            let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
+        match stmt.query_one([model::normalized_id(short)], |row| {
             Ok(model::ClickStats {
-                id,
-                created: row.get(1)?,
-                clicks: row.get(2)?,
+                created: row.get(0)?,
+                clicks: row.get(1)?,
             })
         }) {
             Ok(stats) => Ok(Some(stats)),
@@ -240,21 +193,18 @@ impl StatsDAO {
         }
     }
 
-    pub async fn get_all(&self) -> Result<Vec<model::ClickStats>, Box<DbError>> {
+    pub async fn load_all(&self) -> Result<Vec<model::ClickStats>, Box<DbError>> {
         let conn = self.connection.lock().await;
 
         let mut stmt: rusqlite::Statement<'_> = conn
-            .prepare(r#"SELECT ID, created, clicks FROM stats"#)
+            .prepare(r#"SELECT created, clicks FROM Stats"#)
             .map_err(DbError::from)?;
         let rows = stmt.query([]).map_err(DbError::from)?;
         let results: Result<Vec<model::ClickStats>, rusqlite::Error> = rows
             .map(|row| {
-                let id_string: String = row.get(0)?;
-                let id = Uuid::parse_str(&id_string).expect("Malformed UUIDv4");
                 Ok(model::ClickStats {
-                    id,
-                    created: row.get(1)?,
-                    clicks: row.get(2)?,
+                    created: row.get(0)?,
+                    clicks: row.get(1)?,
                 })
             })
             .collect();
@@ -268,8 +218,8 @@ fn boxed(conn: rusqlite::Connection) -> Arc<Mutex<rusqlite::Connection>> {
 
 fn create_link_table(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     conn.execute(
-        r#"create table if not exists link(
-    ID       TEXT    PRIMARY KEY,         -- UUIDv4
+        r#"create table if not exists Links(
+    ID       TEXT    PRIMARY KEY,         -- normalized version of Short (foobar)
 	short    TEXT    NOT NULL DEFAULT "", -- user-provided short name (Foo-Bar)
 	long     TEXT    NOT NULL DEFAULT "",
 	created  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')), -- unix seconds
@@ -284,8 +234,8 @@ fn create_link_table(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error>
 
 fn create_stats_table(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     conn.execute(
-        r#"create table if not exists stats(
-    ID       TEXT    PRIMARY KEY,                               -- UUIDv4
+        r#"create table if not exists Stats(
+    ID       TEXT    NOT NULL DEFAULT "",                               
 	created  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),  -- unix seconds
 	clicks   INTEGER
 )"#,
@@ -326,60 +276,57 @@ mod tests {
         ////// Links
         let link_created = chrono::Utc::now();
         let test_link = model::Link {
-            id: Uuid::new_v4(),
             short: "nyt".to_string(),
             long: "https://nytimes.com".to_string(),
             created: link_created,
             updated: chrono::Utc::now(),
         };
 
-        // Insert
-        let result = db.link.insert(&test_link).await?;
-        assert_eq!(result, test_link.id);
+        // Save
+        let _ = db.link.save(&test_link).await?;
         // A click stats should be created with null clicks
-        let clicks = db.stats.get(&test_link.id).await?;
+        let clicks = db.stats.load(&test_link.short).await?;
         assert!(clicks.is_some());
         assert!(clicks.unwrap().clicks.is_none());
 
-        // Get
-        let from_db_link = db.link.get_by_id(&result).await?;
+        // Load
+        let from_db_link = db.link.load(&test_link.short).await?;
         assert_eq!(test_link, from_db_link);
         assert_eq!(from_db_link.short, test_link.short);
 
-        // Get All
-        let all_links = db.link.get_all().await?;
+        // Load All
+        let all_links = db.link.load_all().await?;
         assert_eq!(all_links.len(), 1);
         assert_eq!(*all_links.first().unwrap(), test_link);
 
         // Update
         let updated_link = model::Link {
-            id: result,
             short: "nytimes".to_string(),
             long: "https://nytimes.com".to_string(),
             created: link_created,
             updated: chrono::Utc::now(),
         };
-        db.link.update(&updated_link).await?;
-        let read_updated = db.link.get_by_id(&result).await?;
+        db.link.save(&updated_link).await?;
+        let read_updated = db.link.load(&updated_link.short).await?;
         assert_eq!(read_updated.short, updated_link.short);
 
         ////// Stats INCR
-        let mut stats = db.stats.get(&test_link.id).await?;
+        let mut stats = db.stats.load(&updated_link.short).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_none());
         
         db.stats.incr(&updated_link.short).await?;
-        stats = db.stats.get(&test_link.id).await?;
+        stats = db.stats.load(&updated_link.short).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_some_and(|clicks| clicks == 1));
         
         db.stats.incr(&updated_link.short).await?;
-        stats = db.stats.get(&test_link.id).await?;
+        stats = db.stats.load(&updated_link.short).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_some_and(|clicks| clicks == 2));
         
         db.stats.incr(&updated_link.short).await?;
-        stats = db.stats.get(&test_link.id).await?;
+        stats = db.stats.load(&updated_link.short).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_some_and(|clicks| clicks == 3));
 

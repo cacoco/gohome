@@ -1,11 +1,9 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 /// Link is the structure stored for each go short link.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Link {
-    pub id: Uuid,
     pub short: String, // the user-provided "foo" part of "http://go/foo"
     pub long: String,  // the target URL or text/template pattern to run
     pub created: chrono::DateTime<Utc>,
@@ -14,7 +12,6 @@ pub struct Link {
 
 impl std::fmt::Display for Link {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: ", self.id)?;
         write!(f, "go/{} -> {}", self.short, self.long)?;
         write!(f, " [created: {}, updated: {}]", self.created, self.updated)?;
         Ok(())
@@ -23,7 +20,6 @@ impl std::fmt::Display for Link {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ClickStats {
-    pub id: Uuid, // normalized short key Id
     pub created: chrono::DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clicks: Option<i32>, // number of times link has been clicked
@@ -31,7 +27,6 @@ pub struct ClickStats {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PopularLink {
-    pub id: String,    // normalized short key Id
     pub short: String, // the user-provided "foo" part of "http://go/foo"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clicks: Option<i32>, // number of times link has been clicked
@@ -39,7 +34,6 @@ pub struct PopularLink {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LinkDetails {
-    pub id: Uuid,
     pub short: String, // the user-provided "foo" part of "http://go/foo"
     pub long: String,  // the target URL or text/template pattern to run
     pub created: chrono::DateTime<Utc>,
@@ -50,7 +44,7 @@ pub struct LinkDetails {
 
 /// returns the normalized Id for a link short name.
 pub fn normalized_id(short: &str) -> String {
-    url_escape::encode_path(&short.to_lowercase()).replace('-', "to")
+    url_escape::encode_path(&short.to_lowercase()).replace('-', "")
 }
 
 #[cfg(test)]
@@ -69,8 +63,8 @@ mod tests {
     #[test]
     fn test_with_hyphen() {
         let input = "hello-world";
-        // The hyphen should be replaced with "to".
-        let expected = "hellotoworld".to_string();
+        // The hyphen should be replaced with "".
+        let expected = "helloworld".to_string();
         assert_eq!(normalized_id(input), expected);
     }
 
@@ -87,8 +81,8 @@ mod tests {
     #[test]
     fn test_with_special_characters() {
         let input = "a/b?c=d&e";
-        // Characters like '/', '?', '=', '&' should be percent-encoded.
-        let expected = "a%2Fb%3Fc%3Dd%26e".to_string();
+        // The '?' should be percent-encoded.
+        let expected = "a/b%3Fc=d&e".to_string();
         assert_eq!(normalized_id(input), expected);
     }
 
@@ -96,11 +90,7 @@ mod tests {
     #[test]
     fn test_with_hyphen_and_special_chars() {
         let input = "rust-lang/book";
-        // The hyphen is replaced first, then the string is encoded.
-        // Oh, wait, the function encodes *first*, then replaces. Let's trace:
-        // 1. urlencoding::encode("rust-lang/book") -> "rust-lang%2Fbook"
-        // 2. "rust-lang%2Fbook".replace('-', "to") -> "rusttolang%2Fbook"
-        let expected = "rusttolang%2Fbook".to_string();
+        let expected = "rustlang/book".to_string();
         assert_eq!(normalized_id(input), expected);
     }
 
@@ -116,7 +106,7 @@ mod tests {
     #[test]
     fn test_multiple_hyphens() {
         let input = "a-b-c";
-        let expected = "atobtoc".to_string();
+        let expected = "abc".to_string();
         assert_eq!(normalized_id(input), expected);
     }
 }

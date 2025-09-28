@@ -10,7 +10,6 @@ use handlebars::Handlebars;
 use rand::RngCore;
 use regex::Regex;
 use url::Url;
-use uuid::Uuid;
 
 use crate::{
     CreateUpdateRequest, db,
@@ -153,7 +152,6 @@ impl Renderer {
         let most_popular_links: Vec<model::PopularLink> = links
             .iter()
             .map(|(link, stats)| PopularLink {
-                id: link.id.to_string(),
                 short: link.short.clone(),
                 clicks: stats.clicks.or(Some(0)),
             })
@@ -171,7 +169,7 @@ impl Renderer {
     }
 
     pub async fn detail(&self, short: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        match self.db.link.get(short).await {
+        match self.db.link.load(short).await {
             Ok(link) => {
                 match self.handlebars.render(
                     "detail",
@@ -192,7 +190,7 @@ impl Renderer {
     }
 
     pub async fn all(&self) -> Result<Box<dyn warp::Reply>, Infallible> {
-        match self.db.link.get_all().await {
+        match self.db.link.load_all().await {
             Ok(links) => {
                 match self.handlebars.render(
                     "all",
@@ -217,7 +215,7 @@ impl Renderer {
             return redirect("/");
         }
 
-        let links: Vec<model::Link> = self.db.link.get_all().await.unwrap();
+        let links: Vec<model::Link> = self.db.link.load_all().await.unwrap();
         for link in links.iter() {
             if request.short == link.short {
                 return Ok(Box::new(warp::http::StatusCode::BAD_REQUEST));
@@ -225,14 +223,8 @@ impl Renderer {
         }
 
         let link: model::Link = request.into();
-        match self.db.link.insert(&link).await {
-            Ok(id) => match self.db.link.get_by_id(&id).await {
-                Ok(_) => redirect("/"),
-                Err(e) => {
-                    tracing::error!("{e}");
-                    redirect("/")
-                }
-            },
+        match self.db.link.save(&link).await {
+            Ok(_) => redirect("/"),
             Err(e) => {
                 tracing::error!("{e}");
                 redirect("/")
@@ -241,7 +233,7 @@ impl Renderer {
     }
 
     pub async fn new_link(&self, request: CreateUpdateRequest) -> Result<Box<dyn warp::Reply>, Infallible> {
-        let links: Vec<model::Link> = self.db.link.get_all().await.unwrap();
+        let links: Vec<model::Link> = self.db.link.load_all().await.unwrap();
         for link in links.iter() {
             if request.short == link.short {
                 return response(
@@ -251,17 +243,10 @@ impl Renderer {
             }
         }
         let link: model::Link = request.into();
-        match self.db.link.insert(&link).await {
-            Ok(id) => match self.db.link.get_by_id(&id).await {
-                Ok(link) => Ok(Box::new(warp::reply::with_status(
-                    warp::reply::json(&link),
-                    warp::http::StatusCode::CREATED,
-                ))),
-                Err(e) => {
-                    tracing::error!("{e}");
-                    response(&e.to_string(), warp::http::StatusCode::INTERNAL_SERVER_ERROR)
-                }
-            },
+        match self.db.link.save(&link).await {
+            Ok(_) => Ok(Box::new(warp::reply::with_status(
+                warp::reply::json(&link),
+                warp::http::StatusCode::CREATED))),
             Err(e) => {
                 tracing::error!("{e}");
                 response(&e.to_string(), warp::http::StatusCode::INTERNAL_SERVER_ERROR)
@@ -271,7 +256,6 @@ impl Renderer {
 
     pub async fn update(
         &self,
-        id: &Uuid,
         request: CreateUpdateRequest,
         xsrf: &str,
     ) -> Result<Box<dyn warp::Reply>, Infallible> {
@@ -279,52 +263,51 @@ impl Renderer {
             return redirect("/");
         }
 
-        let links = self.db.link.get_all().await.unwrap();
-        let id_list: Vec<Uuid> = links.iter().map(|l| l.id).collect();
-        if !id_list.contains(id) {
-            return redirect(&format!("/.detail/{}", id));
+        let links = self.db.link.load_all().await.unwrap();
+        let id_list: Vec<String> = links.iter().map(|l| l.short.clone()).collect();
+        if !id_list.contains(&request.short) {
+            return redirect(&format!("/.detail/{}", &request.short));
         }
 
-        match self.db.link.get_by_id(id).await {
+        match self.db.link.load(&request.short).await {
             Ok(link) => {
                 let updated_link: model::Link = model::Link {
-                    id: link.id,
                     short: request.short,
                     long: request.target,
                     created: link.created,
                     updated: chrono::Utc::now(),
                 };
-                match self.db.link.update(&updated_link).await {
-                    Ok(()) => redirect(&format!("/.detail/{}", id)),
+                match self.db.link.save(&updated_link).await {
+                    Ok(()) => redirect(&format!("/.detail/{}", &updated_link.short)),
                     Err(e) => {
                         tracing::error!("{e}");
-                        redirect(&format!("/.detail/{}", id))
+                        redirect(&format!("/.detail/{}", &link.short))
                     }
                 }
-            }
+            },
             Err(e) => {
                 tracing::error!("{e}");
-                redirect(&format!("/.detail/{}", id))
+                redirect("/")
             }
         }
     }
 
-    pub async fn delete(&self, id: &Uuid, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
+    pub async fn delete(&self, short: &str, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
         if xsrf != self.xsrf() {
             return redirect("/");
         }
 
-        let links = self.db.link.get_all().await.unwrap();
-        let id_list: Vec<Uuid> = links.iter().map(|l| l.id).collect();
-        if !id_list.contains(id) {
+        let links = self.db.link.load_all().await.unwrap();
+        let id_list: Vec<String> = links.iter().map(|l| l.short.clone()).collect();
+        if !id_list.contains(&short.to_string()) {
             return redirect("/");
         }
 
-        match self.db.link.delete(id).await {
+        match self.db.link.delete(short).await {
             Ok(()) => redirect("/"),
             Err(e) => {
                 tracing::error!("{e}");
-                redirect(&format!("/.detail/{}", id))
+                redirect(&format!("/.detail/{}", short))
             }
         }
     }
@@ -345,7 +328,7 @@ impl Renderer {
     pub async fn export(&self) -> Result<Box<dyn warp::Reply>, Infallible> {
         use serde_jsonlines::WriteExt;
 
-        match self.db.link.get_all().await {
+        match self.db.link.load_all().await {
             Ok(links) => {
                 let buffer = Vec::new();
                 let mut writer = BufWriter::new(buffer);
@@ -371,7 +354,7 @@ impl Renderer {
         full_path: &str,
         query_params: HashMap<String, String>,
     ) -> Result<Box<dyn warp::Reply>, Infallible> {
-        let reply = if let Ok(link) = self.db.link.get(short).await {
+        let reply = if let Ok(link) = self.db.link.load(short).await {
             let path = Renderer::path_remainder(full_path, short);
             self.expand_link(&path, query_params, &link.long).map_or_else(
                 |e| {
@@ -389,10 +372,9 @@ impl Renderer {
     }
 
     pub async fn json_detail(&self, short: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        if let Ok(link) = self.db.link.get(short).await {
-            if let Ok(click_stats) = self.db.stats.get(&link.id).await {
+        if let Ok(link) = self.db.link.load(short).await {
+            if let Ok(click_stats) = self.db.stats.load(&link.short).await {
                 let details = model::LinkDetails {
-                    id: link.id,
                     short: link.short,
                     long: link.long,
                     created: link.created,

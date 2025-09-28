@@ -133,7 +133,6 @@ mod tests {
         let read_response = client.execute(read_request).await?;
         assert_eq!(read_response.status(), warp::http::StatusCode::OK);
         let details = read_response.json::<model::LinkDetails>().await?;
-        assert_eq!(details.id, created_link.id);
         assert_eq!(details.short, "nyt".to_string());
         assert_eq!(details.long, "http://www.nytimes.com".to_string());
         assert_eq!(details.created, created_link.created);
@@ -166,7 +165,6 @@ mod tests {
         let export_bytes = export_response.bytes().await?;
         assert!(!export_bytes.is_empty());
         let exported_link = serde_json::from_slice::<model::Link>(&export_bytes)?;
-        assert_eq!(exported_link.id, created_link.id);
         assert_eq!(exported_link.short, created_link.short);
         assert_eq!(exported_link.long, created_link.long);
         assert_eq!(exported_link.created, created_link.created);
