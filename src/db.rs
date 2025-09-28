@@ -203,11 +203,16 @@ impl StatsDAO {
     pub async fn incr(&self, short: &str) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
-        conn.execute(
+        let rows_affected = conn.execute(
             r#"UPDATE stats SET clicks = IFNULL(clicks, 0) + 1 WHERE stats.ID = (SELECT ID from link where short = ?1)"#,
             [short],
         )
         .map_err(DbError::from)?;
+        // Check the number of rows affected instead of asserting
+        if rows_affected == 0 {
+            // The short link was not found, return a specific error
+            return Err(Box::new(DbError::new(format!("Stats for link with short = {} not found", short))));
+        }
 
         Ok(())
     }
@@ -362,15 +367,18 @@ mod tests {
         let mut stats = db.stats.get(&test_link.id).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_none());
-        db.stats.incr(&test_link.short).await?;
+        
+        db.stats.incr(&updated_link.short).await?;
         stats = db.stats.get(&test_link.id).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_some_and(|clicks| clicks == 1));
-        db.stats.incr(&test_link.short).await?;
+        
+        db.stats.incr(&updated_link.short).await?;
         stats = db.stats.get(&test_link.id).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_some_and(|clicks| clicks == 2));
-        db.stats.incr(&test_link.short).await?;
+        
+        db.stats.incr(&updated_link.short).await?;
         stats = db.stats.get(&test_link.id).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_some_and(|clicks| clicks == 3));
