@@ -50,7 +50,7 @@ pub struct LinkDetails {
 
 /// returns the normalized Id for a link short name.
 pub fn normalized_id(short: &str) -> String {
-    urlencoding::encode(short).replace('-', "to")
+    url_escape::encode_path(&short.to_lowercase()).replace('-', "to")
 }
 
 #[cfg(test)]

@@ -105,16 +105,15 @@ fn get(renderer: Renderer) -> impl Filter<Extract = impl warp::Reply, Error = wa
         .and(warp::path::full())
         .and(warp::query::<HashMap<String, String>>())
         .and(with_renderer(renderer))
-        .and_then(
-            |short: String, path: FullPath, query_params: HashMap<String, String>, renderer: Renderer| async move {
-                if path.as_str().ends_with("+") {
-                    let trimmed = short.strip_suffix("+").unwrap();
-                    renderer.json_detail(trimmed).await
-                } else {
-                    renderer.get(&short, path.as_str(), query_params).await
-                }
-            },
-        )
+        .and_then(|short: String, path: FullPath, query_params: HashMap<String, String>, renderer: Renderer| async move {
+            let path_as_str = path.as_str();
+            if path_as_str.ends_with("+") {
+                let trimmed = short.strip_suffix("+").unwrap_or(path_as_str);
+                renderer.json_detail(trimmed).await
+            } else {
+                renderer.get(&short, path.as_str(), query_params).await
+            }
+        })
 }
 
 fn post(renderer: Renderer) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -141,9 +140,9 @@ fn post(renderer: Renderer) -> impl Filter<Extract = impl warp::Reply, Error = w
 
 pub fn get_routes(
     renderer: Renderer,
-    static_assets: String,
+    assets: String,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    let api_routes = post(renderer.clone())
+    let routes = post(renderer.clone())
         .or(detail(renderer.clone()))
         .or(all(renderer.clone()))
         .or(help(renderer.clone()))
@@ -154,6 +153,6 @@ pub fn get_routes(
         .or(update(renderer.clone()))
         .or(delete(renderer.clone()));
 
-    let static_route = warp::path("assets").and(warp::fs::dir(static_assets));
-    static_route.or(api_routes)
+    let static_route = warp::path("assets").and(warp::fs::dir(assets));
+    static_route.or(routes)
 }

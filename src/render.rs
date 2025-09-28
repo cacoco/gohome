@@ -9,6 +9,7 @@ use csrf::{AesGcmCsrfProtection, CsrfProtection};
 use handlebars::Handlebars;
 use rand::RngCore;
 use regex::Regex;
+use url::Url;
 use uuid::Uuid;
 
 use crate::{
@@ -36,7 +37,8 @@ impl warp::Reply for Message {
     }
 }
 
-handlebars::handlebars_helper!(encode: |query: String| urlencoding::encode(&query).clone());
+handlebars::handlebars_helper!(query_escape: |query_string: String| url_escape::encode_query(&query_string).clone());
+handlebars::handlebars_helper!(path_escape: |path: String| url_escape::encode_path(&path));
 handlebars::handlebars_helper!(trim_suffix: |path: String, suffix: String| {
     match path.strip_suffix(&suffix) {
         Some(result) => result,
@@ -93,7 +95,8 @@ impl Renderer {
         let csrf_token: csrf::CsrfToken = protect.generate_token(&nonce).unwrap();
 
         let mut bars = handlebars.clone();
-        bars.register_helper("encode", Box::new(encode));
+        bars.register_helper("query_escape", Box::new(query_escape));
+        bars.register_helper("path_escape", Box::new(path_escape));
         bars.register_helper("lowercase", Box::new(to_lower));
         bars.register_helper("uppercase", Box::new(to_upper));
         bars.register_helper("trimsuffix", Box::new(trim_suffix));
@@ -118,6 +121,15 @@ impl Renderer {
 fn redirect(location: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
     Ok(Box::new(warp::reply::with_header(
         warp::redirect(location.parse::<warp::http::Uri>().unwrap()),
+        "Cache-Control",
+        "no-cache",
+    )))
+}
+
+fn redirect_with_status(location: &str, status: warp::http::StatusCode) -> Result<Box<dyn warp::Reply>, Infallible> {
+    Ok(Box::new(
+        warp::reply::with_header(
+        warp::reply::with_status(warp::redirect(location.parse::<warp::http::Uri>().unwrap()), status),
         "Cache-Control",
         "no-cache",
     )))
@@ -242,7 +254,7 @@ impl Renderer {
         let link: model::Link = request.into();
         match self.db.link.insert(&link).await {
             Ok(id) => match self.db.link.get_by_id(&id).await {
-                Ok(link) => Ok(Box::new(warp::reply::json(&link))),
+                Ok(link) => Ok(Box::new(warp::reply::with_status(warp::reply::json(&link), warp::http::StatusCode::CREATED))),
                 Err(e) => {
                     tracing::error!("{e}");
                     response(&e.to_string(), warp::http::StatusCode::INTERNAL_SERVER_ERROR)
@@ -357,73 +369,46 @@ impl Renderer {
         full_path: &str,
         query_params: HashMap<String, String>,
     ) -> Result<Box<dyn warp::Reply>, Infallible> {
-        let link_id = model::normalized_id(short);
-        match self.db.link.get(&link_id).await {
-            Ok(link) => {
-                let replacement_slug = if short.starts_with("/") {
-                    short
-                } else {
-                    &format!("/{}", short)
-                };
-                let path = Renderer::path_remainder(full_path, replacement_slug);
-                match self.expand_link(&path, query_params, &link.long) {
-                    Ok(location) => {
-                        match self.db.stats.incr(&link.id).await {
-                            Ok(()) => {}
-                            Err(e) => {
-                                tracing::error!("{e}")
-                            }
-                        }
-                        Ok(Box::new(warp::reply::with_status(
-                            warp::redirect(location.parse::<warp::http::Uri>().unwrap()),
-                            warp::http::StatusCode::PERMANENT_REDIRECT,
-                        )))
-                    }
-                    Err(e) => {
-                        tracing::error!("{e}");
-                        let reply =
-                            warp::reply::with_status(warp::reply(), warp::http::StatusCode::INTERNAL_SERVER_ERROR);
-                        Ok(Box::new(reply))
-                    }
-                }
-            }
-            Err(e) => {
-                tracing::error!("{e}");
-                let reply = warp::reply::with_status(warp::reply(), warp::http::StatusCode::NOT_FOUND);
-                Ok(Box::new(reply))
-            }
-        }
+        let reply = if let Ok(link) = self.db.link.get(short).await {
+            let path = Renderer::path_remainder(full_path, short);
+            self.expand_link(&path, query_params, &link.long)
+                .map_or_else(|e| {
+                    tracing::error!("{e}");
+                    redirect_with_status("/", warp::http::StatusCode::INTERNAL_SERVER_ERROR)
+                }, |location| {
+                    redirect_with_status(&location.to_string(), warp::http::StatusCode::PERMANENT_REDIRECT)
+                })
+        } else {
+            redirect_with_status("/", warp::http::StatusCode::NOT_FOUND)
+        };
+        // incr click stats for short
+        let _ = self.db.stats.incr(short).await;
+        reply
     }
 
     pub async fn json_detail(&self, short: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        match self.db.link.get(short).await {
-            Ok(link) => match self.db.stats.get(&link.id).await {
-                Ok(stats) => {
-                    let details = model::LinkDetails {
-                        id: link.id,
-                        short: link.short,
-                        long: link.long,
-                        created: link.created,
-                        updated: link.updated,
-                        clicks: stats.map(|s| s.clicks.unwrap_or(0)),
-                    };
-                    Ok(Box::new(warp::reply::json(&details)))
-                }
-                Err(e) => {
-                    tracing::error!("{e}");
-                    Ok(Box::new(warp::reply::with_status(
-                        warp::reply(),
-                        warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                    )))
-                }
-            },
-            Err(e) => {
-                tracing::error!("{e}");
+        if let Ok(link) = self.db.link.get(short).await {
+            if let Ok(click_stats) = self.db.stats.get(&link.id).await {
+                let details = model::LinkDetails {
+                    id: link.id,
+                    short: link.short,
+                    long: link.long,
+                    created: link.created,
+                    updated: link.updated,
+                    clicks: click_stats.map(|s| s.clicks.unwrap_or(0)),
+                };
+                Ok(Box::new(warp::reply::json(&details)))
+            } else {
                 Ok(Box::new(warp::reply::with_status(
                     warp::reply(),
-                    warp::http::StatusCode::NOT_FOUND,
+                    warp::http::StatusCode::INTERNAL_SERVER_ERROR,
                 )))
             }
+        } else {
+            Ok(Box::new(warp::reply::with_status(
+                warp::reply(),
+                warp::http::StatusCode::NOT_FOUND,
+            )))
         }
     }
 
@@ -432,9 +417,10 @@ impl Renderer {
     }
 
     fn path_remainder(full_path: &str, short_slug: &str) -> String {
-        match full_path.find(short_slug) {
+        let slug = if short_slug.starts_with("/") {short_slug} else {&format!("/{short_slug}")};
+        match full_path.find(slug) {
             Some(start_index) => {
-                let end_index = start_index + short_slug.len();
+                let end_index = start_index + slug.len();
                 let before_match = &full_path[..start_index];
                 let after_match = &full_path[end_index..];
                 format!("{}{}", before_match, after_match)
@@ -448,8 +434,20 @@ impl Renderer {
         path: &str,
         query_params: HashMap<String, String>,
         long: &str,
-    ) -> Result<String, handlebars::RenderError> {
-        let template = if !long.contains("{{") && !path.is_empty() {
+    ) -> Result<Url, Box<dyn std::error::Error>> {
+        // default behavior is to append remaining path to long URL
+        let template = Self::with_path(path, long);
+        let expanded = self.handlebars.render_template(&template, &serde_json::json!({"path": path}))?;
+        let u = if !query_params.is_empty() {
+            Url::parse_with_params(&expanded, query_params.iter()).map_err(|e| Box::new(e))?
+        } else {
+            Url::parse(&expanded).map_err(|e| Box::new(e))?
+        };
+        Ok(u)
+    }
+
+    fn with_path(path: &str, long: &str) -> String {
+        if !long.contains("{{") && !path.is_empty() {
             if long.ends_with("/") {
                 format!("{}{}", long, "{{path}}")
             } else {
@@ -457,25 +455,7 @@ impl Renderer {
             }
         } else {
             long.to_string()
-        };
-        self.handlebars
-            .render_template(&template, &serde_json::json!({"path": path}))
-            .map(|expanded| {
-                if !query_params.is_empty() {
-                    let mut query_string_vec: Vec<String> = Vec::new();
-                    for (key, value) in &query_params {
-                        query_string_vec.push(format!("{}={}", urlencoding::encode(key), urlencoding::encode(value)));
-                    }
-                    let query_string = &query_string_vec.join("&");
-                    if expanded.contains("?") {
-                        format!("{}&{}", expanded, query_string)
-                    } else {
-                        format!("{}?{}", expanded, query_string)
-                    }
-                } else {
-                    expanded
-                }
-            })
+        }
     }
 }
 
@@ -488,46 +468,49 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_encode() {
+    fn test_query_escape() {
         let renderer = Renderer::empty();
         let res = renderer
             .expand_link(
                 "",
                 HashMap::new(),
-                "https://www.google.com/{{#if path}}search?q={{encode path}}{{/if}}",
+                "https://www.google.com/{{#if path}}search?q={{query_escape path}}{{/if}}",
             )
-            .unwrap();
+            .unwrap()
+            .to_string();
         assert_eq!(res, "https://www.google.com/");
     }
 
     #[test]
-    fn test_encode_1() {
+    fn test_query_escape_1() {
         let renderer = Renderer::empty();
         let res = renderer
             .expand_link(
                 "Tolstoy",
                 HashMap::new(),
-                "https://www.google.com/{{#if path}}search?q={{encode path}}{{/if}}",
+                "https://www.google.com/{{#if path}}search?q={{query_escape path}}{{/if}}",
             )
-            .unwrap();
+            .unwrap()
+            .to_string();
         assert_eq!(res, "https://www.google.com/search?q=Tolstoy");
     }
 
     #[test]
-    fn test_encode_2() {
+    fn test_query_escape_2() {
         let renderer = Renderer::empty();
         let res = renderer
             .expand_link(
                 "Foo Bar baz",
                 HashMap::new(),
-                "https://www.google.com/{{#if path}}search?q={{encode path}}{{/if}}",
+                "https://www.google.com/{{#if path}}search?q={{query_escape path}}{{/if}}",
             )
-            .unwrap();
+            .unwrap()
+            .to_string();
         assert_eq!(res, "https://www.google.com/search?q=Foo%20Bar%20baz");
     }
 
     #[test]
-    fn test_with_query_string() {
+    fn test_query_escape_3() {
         let mut query_params = HashMap::new();
         query_params.insert("a".to_string(), "1".to_string());
         query_params.insert("bb".to_string(), "2".to_string());
@@ -537,9 +520,10 @@ mod tests {
             .expand_link(
                 "Foo Bar baz",
                 query_params,
-                "https://www.google.com/{{#if path}}search?q={{encode path}}{{/if}}",
+                "https://www.google.com/{{#if path}}search?q={{query_escape path}}{{/if}}",
             )
-            .unwrap();
+            .unwrap()
+            .to_string();
         let url = Url::parse(&res).unwrap();
         let pairs = url.query_pairs();
         assert!(pairs.count() == 3);
@@ -572,11 +556,11 @@ mod tests {
         let res = renderer
             .handlebars
             .render_template(
-                "https://www.nytimes.com/{{#if path}}{{encode path}}{{/if}}",
+                "https://www.nytimes.com/{{#if path}}{{path_escape path}}{{/if}}",
                 &serde_json::json!({"path": "2025/09/05/theater/broadway.html"}),
             )
             .unwrap();
-        assert_eq!(res, "https://www.nytimes.com/2025%2F09%2F05%2Ftheater%2Fbroadway.html");
+        assert_eq!(res, "https://www.nytimes.com/2025/09/05/theater/broadway.html");
     }
 
     #[test]
@@ -596,82 +580,93 @@ mod tests {
     fn test_to_upper() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("samiam", HashMap::new(), "{{#if path}}{{uppercase path}}{{/if}}")
-            .unwrap();
-        assert_eq!(res, "SAMIAM");
+            .expand_link("samiam", HashMap::new(), "http://foo/{{#if path}}{{uppercase path}}{{/if}}")
+            .unwrap()
+            .to_string();
+        assert_eq!(res, "http://foo/SAMIAM");
     }
 
     #[test]
     fn test_trim_suffix() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("a/", HashMap::new(), "{{#if path}}{{trimsuffix path '/'}}{{/if}}")
-            .unwrap();
-        assert_eq!(res, "a");
+            .expand_link("a/", HashMap::new(), "http://foo/{{#if path}}{{trimsuffix path '/'}}{{/if}}")
+            .unwrap()
+            .to_string();
+        assert_eq!(res, "http://foo/a");
     }
 
     #[test]
     fn test_trim_suffix_1() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("hello, world", HashMap::new(), "{{trimsuffix path ', world'}}")
-            .unwrap();
-        assert_eq!(res, "hello");
+            .expand_link("hello, world", HashMap::new(), "http://foo/{{trimsuffix path ', world'}}")
+            .unwrap()
+            .to_string();
+        assert_eq!(res, "http://foo/hello");
     }
 
     #[test]
     fn test_trim_suffix_2() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("", HashMap::new(), "{{#if path}}{{trimsuffix path '/'}}{{/if}}")
-            .unwrap();
-        assert_eq!(res, "");
+            .expand_link("", HashMap::new(), "http://foo/{{#if path}}{{trimsuffix path '/'}}{{/if}}")
+            .unwrap()
+            .to_string();
+        assert_eq!(res, "http://foo/");
     }
 
     #[test]
     fn test_prefix() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("OOOa", HashMap::new(), "{{#if path}}{{trimprefix path 'OOO'}}{{/if}}")
-            .unwrap();
-        assert_eq!(res, "a");
+            .expand_link("OOOa", HashMap::new(), "http://foo/{{#if path}}{{trimprefix path 'OOO'}}{{/if}}")
+            .unwrap()
+            .to_string();
+        assert_eq!(res, "http://foo/a");
     }
 
     #[test]
     fn test_prefix_1() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("hello, world", HashMap::new(), "{{trimprefix path 'hello, '}}")
-            .unwrap();
-        assert_eq!(res, "world");
+            .expand_link("hello, world", HashMap::new(), "http://foo/{{trimprefix path 'hello, '}}")
+            .unwrap()
+            .to_string();
+        assert_eq!(res, "http://foo/world");
     }
 
     #[test]
     fn test_prefix_2() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("", HashMap::new(), "{{#if path}}{{trimprefix path '/'}}{{/if}}")
-            .unwrap();
-        assert_eq!(res, "");
+            .expand_link("", HashMap::new(), "http://foo/{{#if path}}{{trimprefix path '/'}}{{/if}}")
+            .unwrap()
+            .to_string();
+        assert_eq!(res, "http://foo/");
     }
 
     #[test]
     fn test_now_with_path() {
         let renderer = Renderer::empty();
-        let res = renderer.expand_link("foobar", HashMap::new(), "{{ now }}").unwrap();
+        let res = renderer.expand_link("foobar", HashMap::new(), "http://foo/{{ now }}").unwrap().to_string();
         assert!(!res.is_empty());
-        // res should just be the date -- no path in template
-        let parsed: chrono::DateTime<Utc> = res.parse().unwrap();
+        let url = Url::parse(&res).unwrap();
+        // n should just be the date -- no path in template
+        let n = url.path_segments().unwrap().last().unwrap();
+        let parsed: chrono::DateTime<Utc> = n.parse().unwrap();
         assert!(parsed.type_id() == std::any::TypeId::of::<chrono::DateTime<Utc>>());
     }
 
     #[test]
     fn test_now_no_path() {
         let renderer = Renderer::empty();
-        let res = renderer.expand_link("", HashMap::new(), "{{ now }}").unwrap();
+        let res = renderer.expand_link("", HashMap::new(), "http://foo/{{ now }}").unwrap().to_string();
         assert!(!res.is_empty());
-        // res should just be the date -- no path in template
-        let parsed: chrono::DateTime<Utc> = res.parse().unwrap();
+        let url = Url::parse(&res).unwrap();
+        // n should just be the date -- no path in template
+        let n = url.path_segments().unwrap().last().unwrap();
+        let parsed: chrono::DateTime<Utc> = n.parse().unwrap();
         assert!(parsed.type_id() == std::any::TypeId::of::<chrono::DateTime<Utc>>());
     }
 
@@ -684,7 +679,8 @@ mod tests {
                 HashMap::new(),
                 r#"http://host.com/{{#if (match "\\d+" path)}}id/{{path}}{{else}}search/{{path}}{{/if}}"#,
             )
-            .unwrap();
+            .unwrap()
+            .to_string();
         assert_eq!(res, "http://host.com/id/123");
     }
 
@@ -697,7 +693,8 @@ mod tests {
                 HashMap::new(),
                 r#"http://host.com/{{#if (match "\\d+" path)}}id/{{path}}{{else}}search/{{path}}{{/if}}"#,
             )
-            .unwrap();
+            .unwrap()
+            .to_string();
         assert_eq!(res, "http://host.com/search/foo");
     }
 
@@ -706,7 +703,8 @@ mod tests {
         let renderer = Renderer::empty();
         let res = renderer
             .expand_link("", HashMap::new(), "http://host.com/foo%2f/bar")
-            .unwrap();
+            .unwrap()
+            .to_string();
         assert_eq!(res, "http://host.com/foo%2f/bar");
     }
 
@@ -715,7 +713,8 @@ mod tests {
         let renderer = Renderer::empty();
         let res = renderer
             .expand_link("extra", HashMap::new(), "http://host.com/foo%2f/bar")
-            .unwrap();
+            .unwrap()
+            .to_string();
         assert_eq!(res, "http://host.com/foo%2f/bar/extra");
     }
 
@@ -724,7 +723,8 @@ mod tests {
         let renderer = Renderer::empty();
         let res = renderer
             .expand_link("extra", HashMap::new(), "http://host.com/foo")
-            .unwrap();
+            .unwrap()
+            .to_string();
         assert_eq!(res, "http://host.com/foo/extra");
     }
 
@@ -733,7 +733,8 @@ mod tests {
         let renderer = Renderer::empty();
         let res = renderer
             .expand_link("extra", HashMap::new(), "http://host.com/foo/")
-            .unwrap();
+            .unwrap()
+            .to_string();
         assert_eq!(res, "http://host.com/foo/extra");
     }
 
@@ -746,7 +747,8 @@ mod tests {
                 HashMap::new(),
                 r#"https://roamresearch.com/#/app/ts-corp/page/{{ nowformat "%d/%m/%Y"}}"#,
             )
-            .unwrap();
+            .unwrap()
+            .to_string();
         let path = res.strip_prefix("https://").unwrap();
         let segments: Vec<&str> = path.split("/").collect();
         assert!(segments.len() == 8); // roamresearch.com + # + app + ts-corp + page + d + m + Y = 8
@@ -757,7 +759,8 @@ mod tests {
         let renderer = Renderer::empty();
         let res = renderer
             .expand_link("bar", HashMap::new(), "http://host.com/{{ bar }}")
-            .unwrap();
+            .unwrap()
+            .to_string();
         assert_eq!(res, "http://host.com/");
     }
 
@@ -766,36 +769,37 @@ mod tests {
         let renderer = Renderer::empty();
         let res = renderer
             .expand_link("bar", HashMap::new(), "http://host.com/{{path}}")
-            .unwrap();
+            .unwrap()
+            .to_string();
         assert_eq!(res, "http://host.com/bar");
     }
 
     #[test]
-    fn test_trim_short_1() {
-        let original_path = "nyt/sports/article";
+    fn test_path_remainder_1() {
+        let original_path = "/nyt/sports/article";
         let slug_to_remove = "nyt";
         let result = Renderer::path_remainder(original_path, slug_to_remove);
         assert_eq!(result, "/sports/article");
     }
 
     #[test]
-    fn test_trim_short_2() {
-        let original_id = "post-123-post-456";
+    fn test_path_remainder_2() {
+        let original_id = "/post-123-post-456";
         let first_post = "post-";
         let result = Renderer::path_remainder(original_id, first_post);
         assert_eq!(result, "123-post-456");
     }
 
     #[test]
-    fn test_trim_short_3() {
-        let original_text = "Hello World";
+    fn test_path_remainder_3() {
+        let original_text = "/Hello World";
         let not_found = "Rust";
         let result = Renderer::path_remainder(original_text, not_found);
         assert_eq!(result, original_text);
     }
 
     #[test]
-    fn test_trim_short_4() {
+    fn test_path_remainder_4() {
         let original_path = "/nyt";
         let slug_to_remove = "/nyt";
         let result = Renderer::path_remainder(original_path, slug_to_remove);
