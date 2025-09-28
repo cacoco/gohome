@@ -378,7 +378,7 @@ impl Renderer {
                     tracing::error!("{e}");
                     redirect_with_status("/", warp::http::StatusCode::INTERNAL_SERVER_ERROR)
                 },
-                |location| redirect_with_status(&location.to_string(), warp::http::StatusCode::PERMANENT_REDIRECT),
+                |location| redirect_with_status(location.as_ref(), warp::http::StatusCode::PERMANENT_REDIRECT),
             )
         } else {
             redirect_with_status("/", warp::http::StatusCode::NOT_FOUND)
@@ -447,9 +447,9 @@ impl Renderer {
             .handlebars
             .render_template(&template, &serde_json::json!({"path": path}))?;
         let u = if !query_params.is_empty() {
-            Url::parse_with_params(&expanded, query_params.iter()).map_err(|e| Box::new(e))?
+            Url::parse_with_params(&expanded, query_params.iter()).map_err(Box::new)?
         } else {
-            Url::parse(&expanded).map_err(|e| Box::new(e))?
+            Url::parse(&expanded).map_err(Box::new)?
         };
         Ok(u)
     }
@@ -692,7 +692,7 @@ mod tests {
         assert!(!res.is_empty());
         let url = Url::parse(&res).unwrap();
         // n should just be the date -- no path in template
-        let n = url.path_segments().unwrap().last().unwrap();
+        let n = url.path_segments().unwrap().next_back().unwrap();
         let parsed: chrono::DateTime<Utc> = n.parse().unwrap();
         assert!(parsed.type_id() == std::any::TypeId::of::<chrono::DateTime<Utc>>());
     }
@@ -707,7 +707,7 @@ mod tests {
         assert!(!res.is_empty());
         let url = Url::parse(&res).unwrap();
         // n should just be the date -- no path in template
-        let n = url.path_segments().unwrap().last().unwrap();
+        let n = url.path_segments().unwrap().next_back().unwrap();
         let parsed: chrono::DateTime<Utc> = n.parse().unwrap();
         assert!(parsed.type_id() == std::any::TypeId::of::<chrono::DateTime<Utc>>());
     }

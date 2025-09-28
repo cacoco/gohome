@@ -164,7 +164,7 @@ mod tests {
         let export_response = client.execute(export_request).await?;
         assert_eq!(export_response.status(), warp::http::StatusCode::OK);
         let export_bytes = export_response.bytes().await?;
-        assert!(export_bytes.len() > 0);
+        assert!(!export_bytes.is_empty());
         let exported_link = serde_json::from_slice::<model::Link>(&export_bytes)?;
         assert_eq!(exported_link.id, created_link.id);
         assert_eq!(exported_link.short, created_link.short);
