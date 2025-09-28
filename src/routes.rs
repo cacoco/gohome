@@ -105,15 +105,17 @@ fn get(renderer: Renderer) -> impl Filter<Extract = impl warp::Reply, Error = wa
         .and(warp::path::full())
         .and(warp::query::<HashMap<String, String>>())
         .and(with_renderer(renderer))
-        .and_then(|short: String, path: FullPath, query_params: HashMap<String, String>, renderer: Renderer| async move {
-            let path_as_str = path.as_str();
-            if path_as_str.ends_with("+") {
-                let trimmed = short.strip_suffix("+").unwrap_or(path_as_str);
-                renderer.json_detail(trimmed).await
-            } else {
-                renderer.get(&short, path.as_str(), query_params).await
-            }
-        })
+        .and_then(
+            |short: String, path: FullPath, query_params: HashMap<String, String>, renderer: Renderer| async move {
+                let path_as_str = path.as_str();
+                if path_as_str.ends_with("+") {
+                    let trimmed = short.strip_suffix("+").unwrap_or(path_as_str);
+                    renderer.json_detail(trimmed).await
+                } else {
+                    renderer.get(&short, path.as_str(), query_params).await
+                }
+            },
+        )
 }
 
 fn post(renderer: Renderer) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {

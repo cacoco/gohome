@@ -82,7 +82,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::{collections::HashMap, net::IpAddr};
@@ -101,10 +100,7 @@ mod tests {
         let ipv4_addr = IpAddr::from([127, 0, 0, 1]);
 
         let handler = tokio::task::spawn(async move {
-            warp::serve(routes)
-                .incoming(listener)
-                .run()
-                .await;
+            warp::serve(routes).incoming(listener).run().await;
         });
 
         let client = reqwest::Client::builder()
@@ -113,7 +109,7 @@ mod tests {
             .timeout(Duration::from_secs(2))
             .local_address(ipv4_addr)
             .build()?;
-        
+
         // post to create
         let mut form_data: HashMap<String, String> = HashMap::new();
         form_data.insert("short".to_string(), "nyt".to_string());
@@ -132,9 +128,7 @@ mod tests {
         assert_eq!(created_link.long, "http://www.nytimes.com".to_string());
 
         // read details go/short+
-        let read_request = client
-            .get(format!("http://{}/nyt+", addr))
-            .build()?;
+        let read_request = client.get(format!("http://{}/nyt+", addr)).build()?;
 
         let read_response = client.execute(read_request).await?;
         assert_eq!(read_response.status(), warp::http::StatusCode::OK);
@@ -147,18 +141,17 @@ mod tests {
         assert!(details.clicks.is_some_and(|s| s == 0));
 
         // trigger a click go/short
-        let gohome_request = client
-            .get(format!("http://{}/nyt", addr))
-            .build()?;
+        let gohome_request = client.get(format!("http://{}/nyt", addr)).build()?;
 
         let gohome_response = client.execute(gohome_request).await?;
         assert_eq!(gohome_response.status(), warp::http::StatusCode::PERMANENT_REDIRECT);
-        assert_eq!(gohome_response.headers().get("Location").unwrap().to_str().unwrap(), "http://www.nytimes.com/");
+        assert_eq!(
+            gohome_response.headers().get("Location").unwrap().to_str().unwrap(),
+            "http://www.nytimes.com/"
+        );
 
         // read details go/short+ (again)
-        let read_request_post_click = client
-            .get(format!("http://{}/nyt+", addr))
-            .build()?;
+        let read_request_post_click = client.get(format!("http://{}/nyt+", addr)).build()?;
 
         let read_response_post_click = client.execute(read_request_post_click).await?;
         assert_eq!(read_response_post_click.status(), warp::http::StatusCode::OK);
@@ -166,9 +159,7 @@ mod tests {
         assert!(details_post_click.clicks.is_some_and(|s| s == 1));
 
         // export go/.export
-        let export_request = client
-            .get(format!("http://{}/.export", addr))
-            .build()?;
+        let export_request = client.get(format!("http://{}/.export", addr)).build()?;
 
         let export_response = client.execute(export_request).await?;
         assert_eq!(export_response.status(), warp::http::StatusCode::OK);

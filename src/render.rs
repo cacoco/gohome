@@ -127,8 +127,7 @@ fn redirect(location: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
 }
 
 fn redirect_with_status(location: &str, status: warp::http::StatusCode) -> Result<Box<dyn warp::Reply>, Infallible> {
-    Ok(Box::new(
-        warp::reply::with_header(
+    Ok(Box::new(warp::reply::with_header(
         warp::reply::with_status(warp::redirect(location.parse::<warp::http::Uri>().unwrap()), status),
         "Cache-Control",
         "no-cache",
@@ -254,7 +253,10 @@ impl Renderer {
         let link: model::Link = request.into();
         match self.db.link.insert(&link).await {
             Ok(id) => match self.db.link.get_by_id(&id).await {
-                Ok(link) => Ok(Box::new(warp::reply::with_status(warp::reply::json(&link), warp::http::StatusCode::CREATED))),
+                Ok(link) => Ok(Box::new(warp::reply::with_status(
+                    warp::reply::json(&link),
+                    warp::http::StatusCode::CREATED,
+                ))),
                 Err(e) => {
                     tracing::error!("{e}");
                     response(&e.to_string(), warp::http::StatusCode::INTERNAL_SERVER_ERROR)
@@ -371,13 +373,13 @@ impl Renderer {
     ) -> Result<Box<dyn warp::Reply>, Infallible> {
         let reply = if let Ok(link) = self.db.link.get(short).await {
             let path = Renderer::path_remainder(full_path, short);
-            self.expand_link(&path, query_params, &link.long)
-                .map_or_else(|e| {
+            self.expand_link(&path, query_params, &link.long).map_or_else(
+                |e| {
                     tracing::error!("{e}");
                     redirect_with_status("/", warp::http::StatusCode::INTERNAL_SERVER_ERROR)
-                }, |location| {
-                    redirect_with_status(&location.to_string(), warp::http::StatusCode::PERMANENT_REDIRECT)
-                })
+                },
+                |location| redirect_with_status(&location.to_string(), warp::http::StatusCode::PERMANENT_REDIRECT),
+            )
         } else {
             redirect_with_status("/", warp::http::StatusCode::NOT_FOUND)
         };
@@ -417,7 +419,11 @@ impl Renderer {
     }
 
     fn path_remainder(full_path: &str, short_slug: &str) -> String {
-        let slug = if short_slug.starts_with("/") {short_slug} else {&format!("/{short_slug}")};
+        let slug = if short_slug.starts_with("/") {
+            short_slug
+        } else {
+            &format!("/{short_slug}")
+        };
         match full_path.find(slug) {
             Some(start_index) => {
                 let end_index = start_index + slug.len();
@@ -437,7 +443,9 @@ impl Renderer {
     ) -> Result<Url, Box<dyn std::error::Error>> {
         // default behavior is to append remaining path to long URL
         let template = Self::with_path(path, long);
-        let expanded = self.handlebars.render_template(&template, &serde_json::json!({"path": path}))?;
+        let expanded = self
+            .handlebars
+            .render_template(&template, &serde_json::json!({"path": path}))?;
         let u = if !query_params.is_empty() {
             Url::parse_with_params(&expanded, query_params.iter()).map_err(|e| Box::new(e))?
         } else {
@@ -580,7 +588,11 @@ mod tests {
     fn test_to_upper() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("samiam", HashMap::new(), "http://foo/{{#if path}}{{uppercase path}}{{/if}}")
+            .expand_link(
+                "samiam",
+                HashMap::new(),
+                "http://foo/{{#if path}}{{uppercase path}}{{/if}}",
+            )
             .unwrap()
             .to_string();
         assert_eq!(res, "http://foo/SAMIAM");
@@ -590,7 +602,11 @@ mod tests {
     fn test_trim_suffix() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("a/", HashMap::new(), "http://foo/{{#if path}}{{trimsuffix path '/'}}{{/if}}")
+            .expand_link(
+                "a/",
+                HashMap::new(),
+                "http://foo/{{#if path}}{{trimsuffix path '/'}}{{/if}}",
+            )
             .unwrap()
             .to_string();
         assert_eq!(res, "http://foo/a");
@@ -600,7 +616,11 @@ mod tests {
     fn test_trim_suffix_1() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("hello, world", HashMap::new(), "http://foo/{{trimsuffix path ', world'}}")
+            .expand_link(
+                "hello, world",
+                HashMap::new(),
+                "http://foo/{{trimsuffix path ', world'}}",
+            )
             .unwrap()
             .to_string();
         assert_eq!(res, "http://foo/hello");
@@ -610,7 +630,11 @@ mod tests {
     fn test_trim_suffix_2() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("", HashMap::new(), "http://foo/{{#if path}}{{trimsuffix path '/'}}{{/if}}")
+            .expand_link(
+                "",
+                HashMap::new(),
+                "http://foo/{{#if path}}{{trimsuffix path '/'}}{{/if}}",
+            )
             .unwrap()
             .to_string();
         assert_eq!(res, "http://foo/");
@@ -620,7 +644,11 @@ mod tests {
     fn test_prefix() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("OOOa", HashMap::new(), "http://foo/{{#if path}}{{trimprefix path 'OOO'}}{{/if}}")
+            .expand_link(
+                "OOOa",
+                HashMap::new(),
+                "http://foo/{{#if path}}{{trimprefix path 'OOO'}}{{/if}}",
+            )
             .unwrap()
             .to_string();
         assert_eq!(res, "http://foo/a");
@@ -630,7 +658,11 @@ mod tests {
     fn test_prefix_1() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("hello, world", HashMap::new(), "http://foo/{{trimprefix path 'hello, '}}")
+            .expand_link(
+                "hello, world",
+                HashMap::new(),
+                "http://foo/{{trimprefix path 'hello, '}}",
+            )
             .unwrap()
             .to_string();
         assert_eq!(res, "http://foo/world");
@@ -640,7 +672,11 @@ mod tests {
     fn test_prefix_2() {
         let renderer = Renderer::empty();
         let res = renderer
-            .expand_link("", HashMap::new(), "http://foo/{{#if path}}{{trimprefix path '/'}}{{/if}}")
+            .expand_link(
+                "",
+                HashMap::new(),
+                "http://foo/{{#if path}}{{trimprefix path '/'}}{{/if}}",
+            )
             .unwrap()
             .to_string();
         assert_eq!(res, "http://foo/");
@@ -649,7 +685,10 @@ mod tests {
     #[test]
     fn test_now_with_path() {
         let renderer = Renderer::empty();
-        let res = renderer.expand_link("foobar", HashMap::new(), "http://foo/{{ now }}").unwrap().to_string();
+        let res = renderer
+            .expand_link("foobar", HashMap::new(), "http://foo/{{ now }}")
+            .unwrap()
+            .to_string();
         assert!(!res.is_empty());
         let url = Url::parse(&res).unwrap();
         // n should just be the date -- no path in template
@@ -661,7 +700,10 @@ mod tests {
     #[test]
     fn test_now_no_path() {
         let renderer = Renderer::empty();
-        let res = renderer.expand_link("", HashMap::new(), "http://foo/{{ now }}").unwrap().to_string();
+        let res = renderer
+            .expand_link("", HashMap::new(), "http://foo/{{ now }}")
+            .unwrap()
+            .to_string();
         assert!(!res.is_empty());
         let url = Url::parse(&res).unwrap();
         // n should just be the date -- no path in template
