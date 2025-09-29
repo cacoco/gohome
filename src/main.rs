@@ -51,6 +51,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .register_template_file("base", format!("{}/base.hbs", args.templates_dir))
         .unwrap();
     handlebars
+        .register_template_file("delete", format!("{}/delete.hbs", args.templates_dir))
+        .unwrap();
+    handlebars
         .register_template_file("detail", format!("{}/detail.hbs", args.templates_dir))
         .unwrap();
     handlebars
@@ -58,6 +61,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
     handlebars
         .register_template_file("home", format!("{}/home.hbs", args.templates_dir))
+        .unwrap();
+    handlebars
+        .register_template_file("success", format!("{}/success.hbs", args.templates_dir))
         .unwrap();
 
     let renderer = Renderer::new(&args.domain, db, handlebars);

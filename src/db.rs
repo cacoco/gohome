@@ -53,17 +53,14 @@ impl LinkDAO {
     pub async fn save(&self, link: &model::Link) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
-        conn.execute(
+        let rows_affected = conn.execute(
             r#"INSERT OR REPLACE INTO Links (ID, short, long, created, updated) values (?1, ?2, ?3, ?4, ?5)"#,
             params![model::normalized_id(&link.short), link.short, link.long, link.created, link.updated],
         )
         .map_err(DbError::from)?;
-
-        conn.execute(
-            r#"INSERT INTO Stats (ID, created, clicks) values (?1, ?2, ?3)"#,
-            params![model::normalized_id(&link.short), chrono::Utc::now(), rusqlite::types::Null],
-        )
-        .map_err(DbError::from)?;
+        if rows_affected != 1 {
+            return Err(Box::new(DbError::new(format!("expected to affect 1 row, affected {}", rows_affected))));
+        }
 
         Ok(())
     }
@@ -71,8 +68,11 @@ impl LinkDAO {
     pub async fn delete(&self, short: &str) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
-        let mut stmt = conn.prepare("DELETE FROM Links WHERE ID = ?1").map_err(DbError::from)?;
-        let _ = stmt.execute([model::normalized_id(short)]).map_err(DbError::from)?;
+        let rows_affected = conn.execute("DELETE FROM Links WHERE ID = ?1", params![model::normalized_id(short)]).map_err(DbError::from)?;
+        if rows_affected != 1 {
+            return Err(Box::new(DbError::new(format!("expected to affect 1 row, affected {}", rows_affected))));
+        }
+        
 
         Ok(())
     }
@@ -121,9 +121,10 @@ impl LinkDAO {
 
         let mut stmt: rusqlite::Statement<'_> = conn
             .prepare(
-                r#"SELECT l.ID, l.short, l.long, l.created, l.updated, s.ID, s.created, s.clicks
+                r#"SELECT l.short, l.long, l.created, l.updated, s.created, s.clicks
         FROM Links l
         INNER JOIN Stats s ON s.ID = l.ID
+        WHERE s.clicks NOT NULL
         ORDER BY s.clicks DESC
         LIMIT 10"#,
             )
@@ -157,6 +158,21 @@ impl StatsDAO {
         Self { connection }
     }
 
+    pub async fn save(&self, short: &str) -> Result<(), Box<DbError>> {
+        let conn = self.connection.lock().await;
+
+        let rows_affected = conn.execute(
+            r#"INSERT INTO Stats (ID, created, clicks) values (?1, ?2, ?3)"#,
+            params![model::normalized_id(short), chrono::Utc::now(), rusqlite::types::Null],
+        )
+        .map_err(DbError::from)?;
+        if rows_affected != 1 {
+            return Err(Box::new(DbError::new(format!("expected to affect 1 row, affected {}", rows_affected))));
+        }
+
+        Ok(())
+    }
+
     pub async fn incr(&self, short: &str) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
@@ -165,11 +181,9 @@ impl StatsDAO {
             [model::normalized_id(short)],
         )
         .map_err(DbError::from)?;
-        if rows_affected == 0 {
-            // The short link was not found, return a specific error
-            return Err(Box::new(DbError::new(format!("Stats for link with short = {} not found", short))));
+        if rows_affected != 1 {
+            return Err(Box::new(DbError::new(format!("expected to affect 1 row, affected {}", rows_affected))));
         }
-
         Ok(())
     }
 
@@ -210,10 +224,17 @@ impl StatsDAO {
             .collect();
         results.map_err(|e| Box::new(DbError::from(e)))
     }
-}
 
-fn boxed(conn: rusqlite::Connection) -> Arc<Mutex<rusqlite::Connection>> {
-    Arc::new(Mutex::new(conn))
+    pub async fn delete(&self, short: &str) -> Result<(), Box<DbError>> {
+        let conn = self.connection.lock().await;
+
+        let rows_affected = conn.execute("DELETE FROM Stats WHERE ID = ?1", params![model::normalized_id(short)]).map_err(DbError::from)?;
+        if rows_affected != 1 {
+            return Err(Box::new(DbError::new(format!("expected to affect 1 row, affected {}", rows_affected))));
+        }
+
+        Ok(())
+    }
 }
 
 fn create_link_table(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
@@ -255,7 +276,7 @@ impl Db {
         create_link_table(&connection)?;
         create_stats_table(&connection)?;
 
-        let boxed_connection = boxed(connection);
+        let boxed_connection = Arc::new(Mutex::new(connection));
         Ok(Self {
             link: LinkDAO::new(Arc::clone(&boxed_connection)),
             stats: StatsDAO::new(Arc::clone(&boxed_connection)),
@@ -277,14 +298,14 @@ mod tests {
         let link_created = chrono::Utc::now();
         let test_link = model::Link {
             short: "nyt".to_string(),
-            long: "https://nytimes.com".to_string(),
+            long: "https://www.nytimes.com".to_string(),
             created: link_created,
             updated: chrono::Utc::now(),
         };
 
         // Save
-        let _ = db.link.save(&test_link).await?;
-        // A click stats should be created with null clicks
+        db.link.save(&test_link).await?;
+        db.stats.save(&test_link.short).await?;
         let clicks = db.stats.load(&test_link.short).await?;
         assert!(clicks.is_some());
         assert!(clicks.unwrap().clicks.is_none());
@@ -301,7 +322,7 @@ mod tests {
 
         // Update
         let updated_link = model::Link {
-            short: "nytimes".to_string(),
+            short: "nyt".to_string(), // cannot update the short -- MUST stay the same
             long: "https://nytimes.com".to_string(),
             created: link_created,
             updated: chrono::Utc::now(),
@@ -329,6 +350,23 @@ mod tests {
         stats = db.stats.load(&updated_link.short).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_some_and(|clicks| clicks == 3));
+
+        let res = db.link.most_popular().await?;
+        assert!(res.len() == 1);
+        let most_popular_links: Vec<model::PopularLink> = res
+            .iter()
+            .map(|(link, stats)| model::PopularLink {
+                short: link.short.clone(),
+                clicks: stats.clicks.or(Some(0)),
+            })
+            .collect();
+        assert!(most_popular_links.len() == 1);
+
+        // Delete
+        db.link.delete(&test_link.short).await?;
+        db.stats.delete(&test_link.short).await?;
+        let clicks = db.stats.load(&test_link.short).await?;
+        assert!(clicks.is_none());
 
         Ok(())
     }

@@ -13,7 +13,7 @@ use url::Url;
 
 use crate::{
     CreateUpdateRequest, db,
-    model::{self, PopularLink},
+    model,
 };
 
 const PARENT_PARTIAL: &str = "base";
@@ -137,6 +137,16 @@ fn response(message: &str, status: warp::http::StatusCode) -> Result<Box<dyn war
     Ok(Box::new(warp::reply::with_status(Message::new(message), status)))
 }
 
+fn html(response: String) -> Result<Box<dyn warp::Reply>, Infallible> {
+    Ok(Box::new(warp::reply::html(response)))
+}
+
+fn json<T>(json: T, status: warp::http::StatusCode) -> Result<Box<dyn warp::Reply>, Infallible>
+where
+    T: serde::Serialize {
+    Ok(Box::new(warp::reply::with_status(warp::reply::json(&json), status)))
+}
+
 impl Renderer {
     pub async fn home(&self) -> Result<Box<dyn warp::Reply>, Infallible> {
         let mut links: Vec<(model::Link, model::ClickStats)> = Vec::new();
@@ -145,13 +155,13 @@ impl Renderer {
                 links.append(&mut results);
             }
             Err(e) => {
-                tracing::error!("{e}");
+                tracing::error!("home 1: {e}");
             }
         }
 
         let most_popular_links: Vec<model::PopularLink> = links
             .iter()
-            .map(|(link, stats)| PopularLink {
+            .map(|(link, stats)| model::PopularLink {
                 short: link.short.clone(),
                 clicks: stats.clicks.or(Some(0)),
             })
@@ -160,9 +170,9 @@ impl Renderer {
             "home",
             &serde_json::json!({"go": self.host, "parent": PARENT_PARTIAL, "links": most_popular_links, "XSRF": self.xsrf()}),
         ) {
-            Ok(response) => Ok(Box::new(warp::reply::html(response))),
+            Ok(response) => html(response),
             Err(e) => {
-                tracing::error!("{e}");
+                tracing::error!("home 2: {e}");
                 redirect("/")
             }
         }
@@ -175,15 +185,15 @@ impl Renderer {
                     "detail",
                     &serde_json::json!({"go": self.host, "parent": PARENT_PARTIAL, "link": link, "XSRF": self.xsrf()}),
                 ) {
-                    Ok(response) => Ok(Box::new(warp::reply::html(response))),
+                    Ok(response) => html(response),
                     Err(e) => {
-                        tracing::error!("{e}");
+                        tracing::error!("detail 1: {e}");
                         redirect("/")
                     }
                 }
             }
             Err(e) => {
-                tracing::error!("{e}");
+                tracing::error!("detail 2: {e}");
                 redirect("/")
             }
         }
@@ -196,15 +206,15 @@ impl Renderer {
                     "all",
                     &serde_json::json!({"links": links, "go": self.host, "parent": PARENT_PARTIAL}),
                 ) {
-                    Ok(response) => Ok(Box::new(warp::reply::html(response))),
+                    Ok(response) => html(response),
                     Err(e) => {
-                        tracing::error!("{e}");
+                        tracing::error!("all 1: {e}");
                         redirect("/.all")
                     }
                 }
             }
             Err(e) => {
-                tracing::error!("{e}");
+                tracing::error!("all 2: {e}");
                 redirect("/.all")
             }
         }
@@ -215,41 +225,59 @@ impl Renderer {
             return redirect("/");
         }
 
-        let links: Vec<model::Link> = self.db.link.load_all().await.unwrap();
-        for link in links.iter() {
-            if request.short == link.short {
-                return Ok(Box::new(warp::http::StatusCode::BAD_REQUEST));
-            }
-        }
-
-        let link: model::Link = request.into();
-        match self.db.link.save(&link).await {
-            Ok(_) => redirect("/"),
-            Err(e) => {
-                tracing::error!("{e}");
-                redirect("/")
+        let link = request.clone().into();
+        let short = request.short.as_str();
+        match self.db.link.load(short).await {
+            Ok(_) => Ok(Box::new(warp::http::StatusCode::BAD_REQUEST)),
+            Err(_) => {
+                let reply = match self.db.link.save(&link).await {
+                    Ok(_) => {
+                        match self.handlebars.render(
+                            "success",
+                            &serde_json::json!({"go": self.host, "parent": PARENT_PARTIAL, "link": link, "XSRF": self.xsrf()}),
+                        ) {
+                            Ok(response) => html(response),
+                            Err(e) => {
+                                tracing::error!("create 1: {e}");
+                                redirect("/")
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        tracing::error!("create 2: {e}");
+                        redirect("/")
+                    }
+                };
+                // create click stats for short
+                let _ = self.db.stats.save(short).await;
+                reply
             }
         }
     }
 
+    // for answering POST requests
     pub async fn new_link(&self, request: CreateUpdateRequest) -> Result<Box<dyn warp::Reply>, Infallible> {
-        let links: Vec<model::Link> = self.db.link.load_all().await.unwrap();
-        for link in links.iter() {
-            if request.short == link.short {
-                return response(
+        let link: model::Link = request.clone().into();
+        let short = request.short.as_str();
+        match self.db.link.load(short).await {
+            Ok(_) => {
+                response(
                     "Link with short code already exists",
                     warp::http::StatusCode::BAD_REQUEST,
-                );
-            }
-        }
-        let link: model::Link = request.into();
-        match self.db.link.save(&link).await {
-            Ok(_) => Ok(Box::new(warp::reply::with_status(
-                warp::reply::json(&link),
-                warp::http::StatusCode::CREATED))),
-            Err(e) => {
-                tracing::error!("{e}");
-                response(&e.to_string(), warp::http::StatusCode::INTERNAL_SERVER_ERROR)
+                )
+            },
+            Err(_) => {
+                let reply = match self.db.link.save(&link).await {
+                    Ok(_) => json(link, warp::http::StatusCode::CREATED),
+                    Err(e) => {
+                        tracing::error!("new_link 1: {e}");
+                        response(&e.to_string(), warp::http::StatusCode::INTERNAL_SERVER_ERROR)
+                    }
+                };
+
+                // create click stats for short
+                let _ = self.db.stats.save(short).await;
+                reply
             }
         }
     }
@@ -263,31 +291,37 @@ impl Renderer {
             return redirect("/");
         }
 
-        let links = self.db.link.load_all().await.unwrap();
-        let id_list: Vec<String> = links.iter().map(|l| l.short.clone()).collect();
-        if !id_list.contains(&request.short) {
-            return redirect(&format!("/.detail/{}", &request.short));
-        }
-
-        match self.db.link.load(&request.short).await {
+        let short = request.short.as_str();
+        match self.db.link.load(short).await {
             Ok(link) => {
                 let updated_link: model::Link = model::Link {
-                    short: request.short,
+                    short: short.to_string(),
                     long: request.target,
                     created: link.created,
                     updated: chrono::Utc::now(),
                 };
                 match self.db.link.save(&updated_link).await {
-                    Ok(()) => redirect(&format!("/.detail/{}", &updated_link.short)),
+                    Ok(()) => {
+                        match self.handlebars.render(
+                            "success",
+                            &serde_json::json!({"go": self.host, "parent": PARENT_PARTIAL, "link": link, "XSRF": self.xsrf()}),
+                        ) {
+                            Ok(response) => Ok(Box::new(warp::reply::html(response))),
+                            Err(e) => {
+                                tracing::error!("update 1: {e}");
+                                redirect(&format!("/.detail/{}", short))
+                            }
+                        }
+                    },
                     Err(e) => {
-                        tracing::error!("{e}");
-                        redirect(&format!("/.detail/{}", &link.short))
+                        tracing::error!("update 2: {e}");
+                        redirect(&format!("/.detail/{}", short))
                     }
                 }
             },
             Err(e) => {
-                tracing::error!("{e}");
-                redirect("/")
+                tracing::error!("update 3: {e}");
+                redirect_with_status(&format!("/.detail/{}", &request.short), warp::http::StatusCode::NOT_FOUND)
             }
         }
     }
@@ -297,17 +331,34 @@ impl Renderer {
             return redirect("/");
         }
 
-        let links = self.db.link.load_all().await.unwrap();
-        let id_list: Vec<String> = links.iter().map(|l| l.short.clone()).collect();
-        if !id_list.contains(&short.to_string()) {
-            return redirect("/");
-        }
-
-        match self.db.link.delete(short).await {
-            Ok(()) => redirect("/"),
+        match self.db.link.load(short).await {
+            Ok(to_delete) => {
+                let reply = match self.db.link.delete(short).await {
+                    Ok(()) => {
+                        tracing::info!("Successfully deleted, rendering delete template");
+                        match self.handlebars.render(
+                            "delete",
+                            &serde_json::json!({"go": self.host, "parent": PARENT_PARTIAL, "link": to_delete, "XSRF": self.xsrf()}),
+                        ) {
+                            Ok(response) => html(response),
+                            Err(e) => {
+                                tracing::error!("delete 1: {e}");
+                                redirect(&format!("/.detail/{}", short))
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        tracing::error!("delete 2: {e}");
+                        redirect(&format!("/.detail/{}", short))
+                    }
+                };
+                // delete the click stats for short
+                let _ = self.db.stats.delete(short).await;
+                reply
+            },
             Err(e) => {
-                tracing::error!("{e}");
-                redirect(&format!("/.detail/{}", short))
+                tracing::error!("delete 3: {e}");
+                redirect_with_status("/", warp::http::StatusCode::NOT_FOUND)
             }
         }
     }
@@ -317,9 +368,9 @@ impl Renderer {
             .handlebars
             .render("help", &serde_json::json!({"go": self.host, "parent": PARENT_PARTIAL}))
         {
-            Ok(response) => Ok(Box::new(warp::reply::html(response))),
+            Ok(response) => html(response),
             Err(e) => {
-                tracing::error!("{e}");
+                tracing::error!("help 1: {e}");
                 redirect("/")
             }
         }
@@ -342,7 +393,7 @@ impl Renderer {
                 )))
             }
             Err(e) => {
-                tracing::error!("{e}");
+                tracing::error!("export 1: {e}");
                 redirect("/")
             }
         }
@@ -358,7 +409,7 @@ impl Renderer {
             let path = Renderer::path_remainder(full_path, short);
             self.expand_link(&path, query_params, &link.long).map_or_else(
                 |e| {
-                    tracing::error!("{e}");
+                    tracing::error!("get 1: {e}");
                     redirect_with_status("/", warp::http::StatusCode::INTERNAL_SERVER_ERROR)
                 },
                 |location| redirect_with_status(location.as_ref(), warp::http::StatusCode::PERMANENT_REDIRECT),
