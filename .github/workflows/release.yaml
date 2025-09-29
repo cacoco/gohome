@@ -27,10 +27,11 @@ jobs:
           cargo install toml-cli
       - id: pkg-version
         run: |
-          VERSION="${${{ github.ref }}:1}"
-          cargo set-version "$VERSION"
+          ref_string="${{ github.ref }}"
+          version="${ref_string#refs/tags/v}"
+          cargo set-version "$version"
           cargo update gohome
-          echo "package-version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "package-version=$version" >> "$GITHUB_OUTPUT"
       - uses: peter-evans/create-pull-request@v7
         id: create-pull-request
         with:
