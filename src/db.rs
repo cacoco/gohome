@@ -53,13 +53,23 @@ impl LinkDAO {
     pub async fn save(&self, link: &model::Link) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
-        let rows_affected = conn.execute(
-            r#"INSERT OR REPLACE INTO Links (ID, short, long, created, updated) values (?1, ?2, ?3, ?4, ?5)"#,
-            params![model::normalized_id(&link.short), link.short, link.long, link.created, link.updated],
-        )
-        .map_err(DbError::from)?;
+        let rows_affected = conn
+            .execute(
+                r#"INSERT OR REPLACE INTO Links (ID, short, long, created, updated) values (?1, ?2, ?3, ?4, ?5)"#,
+                params![
+                    model::normalized_id(&link.short),
+                    link.short,
+                    link.long,
+                    link.created,
+                    link.updated
+                ],
+            )
+            .map_err(DbError::from)?;
         if rows_affected != 1 {
-            return Err(Box::new(DbError::new(format!("expected to affect 1 row, affected {}", rows_affected))));
+            return Err(Box::new(DbError::new(format!(
+                "expected to affect 1 row, affected {}",
+                rows_affected
+            ))));
         }
 
         Ok(())
@@ -68,11 +78,15 @@ impl LinkDAO {
     pub async fn delete(&self, short: &str) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
-        let rows_affected = conn.execute("DELETE FROM Links WHERE ID = ?1", params![model::normalized_id(short)]).map_err(DbError::from)?;
+        let rows_affected = conn
+            .execute("DELETE FROM Links WHERE ID = ?1", params![model::normalized_id(short)])
+            .map_err(DbError::from)?;
         if rows_affected != 1 {
-            return Err(Box::new(DbError::new(format!("expected to affect 1 row, affected {}", rows_affected))));
+            return Err(Box::new(DbError::new(format!(
+                "expected to affect 1 row, affected {}",
+                rows_affected
+            ))));
         }
-        
 
         Ok(())
     }
@@ -161,13 +175,17 @@ impl StatsDAO {
     pub async fn save(&self, short: &str) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
-        let rows_affected = conn.execute(
-            r#"INSERT INTO Stats (ID, created, clicks) values (?1, ?2, ?3)"#,
-            params![model::normalized_id(short), chrono::Utc::now(), rusqlite::types::Null],
-        )
-        .map_err(DbError::from)?;
+        let rows_affected = conn
+            .execute(
+                r#"INSERT INTO Stats (ID, created, clicks) values (?1, ?2, ?3)"#,
+                params![model::normalized_id(short), chrono::Utc::now(), rusqlite::types::Null],
+            )
+            .map_err(DbError::from)?;
         if rows_affected != 1 {
-            return Err(Box::new(DbError::new(format!("expected to affect 1 row, affected {}", rows_affected))));
+            return Err(Box::new(DbError::new(format!(
+                "expected to affect 1 row, affected {}",
+                rows_affected
+            ))));
         }
 
         Ok(())
@@ -176,13 +194,17 @@ impl StatsDAO {
     pub async fn incr(&self, short: &str) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
-        let rows_affected = conn.execute(
-            r#"UPDATE Stats SET clicks = IFNULL(clicks, 0) + 1 WHERE stats.ID = ?1"#,
-            [model::normalized_id(short)],
-        )
-        .map_err(DbError::from)?;
+        let rows_affected = conn
+            .execute(
+                r#"UPDATE Stats SET clicks = IFNULL(clicks, 0) + 1 WHERE stats.ID = ?1"#,
+                [model::normalized_id(short)],
+            )
+            .map_err(DbError::from)?;
         if rows_affected != 1 {
-            return Err(Box::new(DbError::new(format!("expected to affect 1 row, affected {}", rows_affected))));
+            return Err(Box::new(DbError::new(format!(
+                "expected to affect 1 row, affected {}",
+                rows_affected
+            ))));
         }
         Ok(())
     }
@@ -228,9 +250,14 @@ impl StatsDAO {
     pub async fn delete(&self, short: &str) -> Result<(), Box<DbError>> {
         let conn = self.connection.lock().await;
 
-        let rows_affected = conn.execute("DELETE FROM Stats WHERE ID = ?1", params![model::normalized_id(short)]).map_err(DbError::from)?;
+        let rows_affected = conn
+            .execute("DELETE FROM Stats WHERE ID = ?1", params![model::normalized_id(short)])
+            .map_err(DbError::from)?;
         if rows_affected != 1 {
-            return Err(Box::new(DbError::new(format!("expected to affect 1 row, affected {}", rows_affected))));
+            return Err(Box::new(DbError::new(format!(
+                "expected to affect 1 row, affected {}",
+                rows_affected
+            ))));
         }
 
         Ok(())
@@ -335,17 +362,17 @@ mod tests {
         let mut stats = db.stats.load(&updated_link.short).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_none());
-        
+
         db.stats.incr(&updated_link.short).await?;
         stats = db.stats.load(&updated_link.short).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_some_and(|clicks| clicks == 1));
-        
+
         db.stats.incr(&updated_link.short).await?;
         stats = db.stats.load(&updated_link.short).await?;
         assert!(stats.is_some());
         assert!(stats.unwrap().clicks.is_some_and(|clicks| clicks == 2));
-        
+
         db.stats.incr(&updated_link.short).await?;
         stats = db.stats.load(&updated_link.short).await?;
         assert!(stats.is_some());

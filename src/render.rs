@@ -11,10 +11,7 @@ use rand::RngCore;
 use regex::Regex;
 use url::Url;
 
-use crate::{
-    CreateUpdateRequest, db,
-    model,
-};
+use crate::{CreateUpdateRequest, db, model};
 
 const PARENT_PARTIAL: &str = "base";
 
@@ -143,7 +140,8 @@ fn html(response: String) -> Result<Box<dyn warp::Reply>, Infallible> {
 
 fn json<T>(json: T, status: warp::http::StatusCode) -> Result<Box<dyn warp::Reply>, Infallible>
 where
-    T: serde::Serialize {
+    T: serde::Serialize,
+{
     Ok(Box::new(warp::reply::with_status(warp::reply::json(&json), status)))
 }
 
@@ -260,12 +258,10 @@ impl Renderer {
         let link: model::Link = request.clone().into();
         let short = request.short.as_str();
         match self.db.link.load(short).await {
-            Ok(_) => {
-                response(
-                    "Link with short code already exists",
-                    warp::http::StatusCode::BAD_REQUEST,
-                )
-            },
+            Ok(_) => response(
+                "Link with short code already exists",
+                warp::http::StatusCode::BAD_REQUEST,
+            ),
             Err(_) => {
                 let reply = match self.db.link.save(&link).await {
                     Ok(_) => json(link, warp::http::StatusCode::CREATED),
@@ -282,11 +278,7 @@ impl Renderer {
         }
     }
 
-    pub async fn update(
-        &self,
-        request: CreateUpdateRequest,
-        xsrf: &str,
-    ) -> Result<Box<dyn warp::Reply>, Infallible> {
+    pub async fn update(&self, request: CreateUpdateRequest, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
         if xsrf != self.xsrf() {
             return redirect("/");
         }
@@ -318,10 +310,13 @@ impl Renderer {
                         redirect(&format!("/.detail/{}", short))
                     }
                 }
-            },
+            }
             Err(e) => {
                 tracing::error!("update 3: {e}");
-                redirect_with_status(&format!("/.detail/{}", &request.short), warp::http::StatusCode::NOT_FOUND)
+                redirect_with_status(
+                    &format!("/.detail/{}", &request.short),
+                    warp::http::StatusCode::NOT_FOUND,
+                )
             }
         }
     }
@@ -346,7 +341,7 @@ impl Renderer {
                                 redirect(&format!("/.detail/{}", short))
                             }
                         }
-                    },
+                    }
                     Err(e) => {
                         tracing::error!("delete 2: {e}");
                         redirect(&format!("/.detail/{}", short))
@@ -355,7 +350,7 @@ impl Renderer {
                 // delete the click stats for short
                 let _ = self.db.stats.delete(short).await;
                 reply
-            },
+            }
             Err(e) => {
                 tracing::error!("delete 3: {e}");
                 redirect_with_status("/", warp::http::StatusCode::NOT_FOUND)
