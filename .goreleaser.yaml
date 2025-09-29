@@ -51,9 +51,11 @@ dockers:
       - static/base.css
       - templates/all.hbs
       - templates/base.hbs
+      - templates/delete.hbs
       - templates/detail.hbs
       - templates/help.hbs
       - templates/home.hbs
+      - templates/success.hbs
 
 docker_signs:
   - cmd: cosign

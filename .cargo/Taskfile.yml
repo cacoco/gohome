@@ -3,7 +3,8 @@
 version: '3'
 
 env:
-  RUST_BACKTRACE: '1'
+  RUST_BACKTRACE: 'full'
+  RUST_LOG: 'debug'
 
 tasks:
   build:

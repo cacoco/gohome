@@ -1,6 +1,5 @@
 use std::{collections::HashMap, convert::Infallible};
 
-use uuid::Uuid;
 use warp::{Filter, filters::path::FullPath};
 
 use crate::{CreateUpdateRequest, render::Renderer};
@@ -61,12 +60,11 @@ fn update(renderer: Renderer) -> impl Filter<Extract = impl warp::Reply, Error =
         .and(with_renderer(renderer))
         .and_then(|form_data: HashMap<String, String>, renderer: Renderer| async move {
             let xsrf = form_data.get("xsrf").unwrap().to_string();
-            let id = Uuid::parse_str(form_data.get("id").unwrap()).expect("Unable to parse UUIDv4");
             let request = CreateUpdateRequest {
                 short: form_data.get("short").unwrap().to_string(),
                 target: form_data.get("long").unwrap().to_string(),
             };
-            renderer.update(&id, request, &xsrf).await
+            renderer.update(request, &xsrf).await
         })
 }
 
@@ -77,10 +75,9 @@ fn delete(renderer: Renderer) -> impl Filter<Extract = impl warp::Reply, Error =
         .and(warp::body::form())
         .and(with_renderer(renderer))
         .and_then(
-            |id_string: String, form_data: HashMap<String, String>, renderer: Renderer| async move {
+            |short: String, form_data: HashMap<String, String>, renderer: Renderer| async move {
                 let xsrf = form_data.get("xsrf").unwrap().to_string();
-                let id = Uuid::parse_str(&id_string).expect("Unable to parse UUIDv4");
-                renderer.delete(&id, &xsrf).await
+                renderer.delete(&short, &xsrf).await
             },
         )
 }
@@ -107,8 +104,9 @@ fn get(renderer: Renderer) -> impl Filter<Extract = impl warp::Reply, Error = wa
         .and(with_renderer(renderer))
         .and_then(
             |short: String, path: FullPath, query_params: HashMap<String, String>, renderer: Renderer| async move {
-                if path.as_str().ends_with("+") {
-                    let trimmed = short.strip_suffix("+").unwrap();
+                let path_as_str = path.as_str();
+                if path_as_str.ends_with("+") {
+                    let trimmed = short.strip_suffix("+").unwrap_or(path_as_str);
                     renderer.json_detail(trimmed).await
                 } else {
                     renderer.get(&short, path.as_str(), query_params).await
@@ -141,9 +139,9 @@ fn post(renderer: Renderer) -> impl Filter<Extract = impl warp::Reply, Error = w
 
 pub fn get_routes(
     renderer: Renderer,
-    static_assets: String,
+    assets: String,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    let api_routes = post(renderer.clone())
+    let routes = post(renderer.clone())
         .or(detail(renderer.clone()))
         .or(all(renderer.clone()))
         .or(help(renderer.clone()))
@@ -154,6 +152,6 @@ pub fn get_routes(
         .or(update(renderer.clone()))
         .or(delete(renderer.clone()));
 
-    let static_route = warp::path("assets").and(warp::fs::dir(static_assets));
-    static_route.or(api_routes)
+    let static_route = warp::path("assets").and(warp::fs::dir(assets));
+    static_route.or(routes)
 }

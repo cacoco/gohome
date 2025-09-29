@@ -1,6 +1,6 @@
 [package]
 name = "gohome"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
 
 [lib]
@@ -10,13 +10,10 @@ path = "src/lib.rs"
 chrono = { version = "0.4.41", features = ["serde"] }
 clap = { version = "4.5.45", features = ["derive", "env"] }
 csrf = "0.5.0"
-dotenvy = "0.15.7"
 handlebars = { version = "6.3.2", features = ["dir_source"] }
 http-body-util = "0.1.3"
 hyper = "1.7.0"
-maud = { version = "0.27.0", features = ["warp"] }
 openssl = { version = "0.10", features = ["vendored"] }
-# percent-encoding = "2.3.2"
 rand = "0.9.2"
 regex = "1.11.2"
 rusqlite = { version = "0.37.0", features = ["bundled", "chrono", "serde_json"] }
@@ -27,14 +24,13 @@ shadow-rs = { version = "1.2.1", features = ["metadata"] }
 tokio = { version = "1.47.1", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-url = "2.5.7"
-urlencoding = "2.1.3"
-uuid = { version = "1.18.1", features = ["serde", "v4"] }
+url = { version = "2.5.7", features = ["std"] }
 warp = { version = "0.4.1", features = ["server"] }
+url-escape = "0.1.1"
+reqwest = { version = "0.12.23", features = ["json"] }
 
 [build-dependencies]
 shadow-rs = "1.2.1"
 
 [dev-dependencies]
 tempfile = "3.20.0"
-# testcontainers = "0.25.0"
