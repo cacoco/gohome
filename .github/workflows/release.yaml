@@ -70,9 +70,6 @@ jobs:
       - uses: goto-bus-stop/setup-zig@v2
       - uses: sigstore/cosign-installer@v3.8.0
       - uses: anchore/sbom-action/download-syft@v0.18.0
-      - uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - run: |
           echo ${{ secrets.COSIGN_KEY }} >> cosign.key
       - uses: goreleaser/goreleaser-action@v6
