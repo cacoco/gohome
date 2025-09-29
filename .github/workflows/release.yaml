@@ -13,6 +13,10 @@ jobs:
   bump-version:
     runs-on: ubuntu-latest
     steps:
+      - name: dump context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
         with:
