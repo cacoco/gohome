@@ -21,14 +21,12 @@ jobs:
       - run: |
           cargo install cargo-edit
           cargo install toml-cli
-      - run: |
-          VERSION="${${{ github.workflow_ref }}:1}"
-          cargo set-version "$VERSION"
-          cargo update gohome
       - id: pkg-version
         run: |
-          PKG_VERSION=$(toml get -r Cargo.toml 'package.version') 
-          echo "package-version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          VERSION="${${{ github.ref }}:1}"
+          cargo set-version "$VERSION"
+          cargo update gohome
+          echo "package-version=$VERSION" >> "$GITHUB_OUTPUT"
       - uses: peter-evans/create-pull-request@v7
         id: create-pull-request
         with:
