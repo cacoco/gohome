@@ -51,7 +51,6 @@ jobs:
 
             [1]: https://github.com/peter-evans/create-pull-request
           labels: |
-            ${{ github.workflow_ref }}
             release
       - run: gh pr merge --merge --auto "${{ steps.create-pull-request.outputs.pull-request-number }}"
         env:
