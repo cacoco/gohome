@@ -80,9 +80,6 @@ rust-project.json
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,rust,rust-analyzer,macos
 
-# Cosign
-cosign.key
-
 # Task
 .task
 
