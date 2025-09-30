@@ -61,7 +61,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.workflow_ref }}
           fetch-depth: 0
       - uses: docker/login-action@v3
         with:
