@@ -1,0 +1,17 @@
+FROM debian:bullseye-slim
+
+ARG EXECUTABLE="gohome"
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    bash \
+    coreutils && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY static/*.* /usr/src/assets/
+COPY templates/*.hbs    /usr/src/templates/
+COPY entrypoint.sh      /usr/src/entrypoint.sh
+COPY ${EXECUTABLE}      /usr/src/${EXECUTABLE}
+
+ENTRYPOINT [ "/usr/src/entrypoint.sh" ]
