@@ -45,13 +45,9 @@ checksum:
 
 dockers:
   - image_templates:
-      - "ghcr.io/cacoco/gohome-amd64:{{ .Tag }}"
-      - "ghcr.io/cacoco/gohome-amd64:latest"
-    use: buildx
-    build_flag_templates:
-      - "--pull"
-      - "--platform=linux/amd64"
-    dockerfile: Dockerfile-amd
+      - "ghcr.io/cacoco/gohome:{{ .Tag }}"
+      - "ghcr.io/cacoco/gohome:latest"
+    dockerfile: Dockerfile
     extra_files:
       - entrypoint.sh
       - static/base.css
@@ -62,35 +58,6 @@ dockers:
       - templates/help.hbs
       - templates/home.hbs
       - templates/success.hbs
-  - image_templates:
-      - "ghcr.io/cacoco/gohome-arm64:{{ .Tag }}"
-      - "ghcr.io/cacoco/gohome-arm64:latest"
-    use: buildx
-    build_flag_templates:
-      - "--pull"
-      - "--platform=linux/arm64"
-    goarch: arm64
-    dockerfile: Dockerfile-arm
-    extra_files:
-      - entrypoint.sh
-      - static/base.css
-      - templates/all.hbs
-      - templates/base.hbs
-      - templates/delete.hbs
-      - templates/detail.hbs
-      - templates/help.hbs
-      - templates/home.hbs
-      - templates/success.hbs
-
-docker_manifests:
-  - name_template: "ghcr.io/cacoco/gohome-amd64:{{ .Tag }}"
-    image_templates:
-      - "ghcr.io/cacoco/gohome-amd64:{{ .Tag }}"
-      - "ghcr.io/cacoco/gohome-arm64:{{ .Tag }}"
-  - name_template: "ghcr.io/cacoco/gohome-amd64:latest"
-    image_templates:
-      - "ghcr.io/cacoco/gohome-amd64:latest"
-      - "ghcr.io/cacoco/gohome-arm64:latest"
 
 docker_signs:
   - cmd: cosign
