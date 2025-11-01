@@ -83,6 +83,9 @@ rust-project.json
 # Task
 .task
 
+# Cosign
+cosign.key
+
 # Added by goreleaser init:
 dist/
 .intentionally-empty-file.o
