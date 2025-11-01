@@ -75,6 +75,9 @@ jobs:
       - uses: goto-bus-stop/setup-zig@v2
       - uses: sigstore/cosign-installer@v3.8.0
       - uses: anchore/sbom-action/download-syft@v0.18.0
+      - run:
+          echo "${COSIGN_KEY}" | base64 --decode > cosign.key
+        working-directory: gohome
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -83,9 +86,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COSIGN_PWD: ${{ secrets.COSIGN_PWD }}
-      # - uses: actions/attest-build-provenance@v3
-      #   with:
-      #     subject-checksums: './dist/${{ github.event.repository.name }}_checksums.txt'
-      #     push-to-registry: true
-      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/attest-build-provenance@v3
+        with:
+          subject-checksums: './dist/${{ github.event.repository.name }}_checksums.txt'
+          push-to-registry: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
   
