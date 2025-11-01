@@ -84,7 +84,7 @@ impl Renderer {
     pub fn new(host: &str, db: db::Db, handlebars: handlebars::Handlebars<'static>) -> Self {
         let mut secret_key = [0u8; 32];
         rand::rng().fill_bytes(&mut secret_key);
-        let aes_gcm_csrf_protection = AesGcmCsrfProtection::from_key(secret_key); 
+        let aes_gcm_csrf_protection = AesGcmCsrfProtection::from_key(secret_key);
 
         let mut bars = handlebars.clone();
         bars.register_helper("query_escape", Box::new(query_escape));
@@ -218,7 +218,10 @@ impl Renderer {
     }
 
     pub async fn create(&self, request: CreateUpdateRequest, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        if let Err(e) = self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
+        if let Err(e) = self
+            .csrf_key
+            .parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap())
+        {
             tracing::error!("Invalid xsrf token: {e}");
             return redirect("/");
         }
@@ -279,7 +282,10 @@ impl Renderer {
     }
 
     pub async fn update(&self, request: CreateUpdateRequest, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        if let Err(e) = self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
+        if let Err(e) = self
+            .csrf_key
+            .parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap())
+        {
             tracing::error!("Invalid xsrf token: {e}");
             return redirect("/");
         }
@@ -323,7 +329,10 @@ impl Renderer {
     }
 
     pub async fn delete(&self, short: &str, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        if let Err(e) = self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
+        if let Err(e) = self
+            .csrf_key
+            .parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap())
+        {
             tracing::error!("Invalid xsrf token: {e}");
             return redirect("/");
         }
