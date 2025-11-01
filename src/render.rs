@@ -218,12 +218,9 @@ impl Renderer {
     }
 
     pub async fn create(&self, request: CreateUpdateRequest, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        match self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
-            Err(e) => {
-                tracing::error!("Invalid xsrf token: {e}");
-                return redirect("/");
-            },
-            _ => {}, // do nothing
+        if let Err(e) = self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
+            tracing::error!("Invalid xsrf token: {e}");
+            return redirect("/");
         }
 
         let link = request.clone().into();
@@ -282,12 +279,9 @@ impl Renderer {
     }
 
     pub async fn update(&self, request: CreateUpdateRequest, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        match self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
-            Err(e) => {
-                tracing::error!("Invalid xsrf token: {e}");
-                return redirect("/");
-            },
-            _ => {}, // do nothing
+        if let Err(e) = self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
+            tracing::error!("Invalid xsrf token: {e}");
+            return redirect("/");
         }
 
         let short = request.short.as_str();
@@ -329,12 +323,9 @@ impl Renderer {
     }
 
     pub async fn delete(&self, short: &str, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        match self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
-            Err(e) => {
-                tracing::error!("Invalid xsrf token: {e}");
-                return redirect("/");
-            },
-            _ => {}, // do nothing
+        if let Err(e) = self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
+            tracing::error!("Invalid xsrf token: {e}");
+            return redirect("/");
         }
 
         match self.db.link.load(short).await {
