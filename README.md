@@ -10,13 +10,9 @@ We currently use the Tailscale [golink](https://github.com/tailscale/golink) app
 
 The project is purposely meant to resemble the original Tailscale golink application to be somewhat of a seemless transition.
 
-### Why is this in Rust?
+### Why re-write in Rust?
 
-A personal challenge to develop Rust experience.
-
-## Known Issues
-
-Currently the XSRF token isn't properly generated.
+A personal challenge to develop more Rust experience.
 
 ## Disclaimer
 
