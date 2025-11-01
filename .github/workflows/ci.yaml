@@ -1,52 +1,54 @@
 name: continuous-integration
 on:
-    push:
-        branches: [ "main" ]
-    pull_request:
-        branches: [ "main" ]
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 env:
-    CARGO_TERM_COLOR: 'always'
-    RUST_BACKTRACE: '1'
-    RUST_VERSION: '1.90.0'
+  CARGO_TERM_COLOR: 'always'
+  RUST_BACKTRACE: '1'
+  RUST_VERSION: '1.90.0'
 jobs:
-    rustfmt:
-        if: ${{ github.event_name == 'pull_request' }}
-        runs-on: ubuntu-24.04-arm
-        permissions:
-            contents: read
-            pull-requests: write
-        steps:
-            - uses: actions/checkout@v5
-            - uses: dtolnay/rust-toolchain@nightly
-              with:
-                components: rustfmt
-            - uses: mbrobbel/rustfmt-check@master
-              with:
-                token: ${{ secrets.GITHUB_TOKEN }}
-                mode: review
-    test:
-        runs-on: ubuntu-24.04-arm
-        steps:
-            - uses: actions/checkout@v5
-            - uses: arduino/setup-task@v2
-              with:
-                repo-token: ${{ secrets.GITHUB_TOKEN }}
-            - uses: dtolnay/rust-toolchain@master
-              with:
-                toolchain: ${{ env.RUST_VERSION }}
-            - uses: taiki-e/install-action@nextest
-            - uses: actions/cache@v4
-              continue-on-error: false
-              with:
-                path: |
-                  ~/.cargo/bin/
-                  ~/.cargo/registry/index
-                  ~/.cargo/registry/cache
-                  target/
-                key: ${{ runner.os }}-${{ github.workflow }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-                restore-keys: |
-                  ${{ runner.os }}-${{ github.workflow }}-cargo-test-
-            - run: task cargo:test
+  rustfmt:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - uses: mbrobbel/rustfmt-check@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          mode: review
+  test:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - uses: taiki-e/install-action@nextest
+      - uses: actions/cache@v4
+        continue-on-error: false
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target/
+          key: ${{ runner.os }}-${{ github.workflow }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.workflow }}-cargo-test-
+      - run: task cargo:test

@@ -76,7 +76,7 @@ jobs:
       - uses: sigstore/cosign-installer@v3.8.0
       - uses: anchore/sbom-action/download-syft@v0.18.0
       - run:
-          echo "${COSIGN_KEY}" | base64 --decode > cosign.key
+          echo "${{ secrets.COSIGN_KEY }}" | base64 --decode > cosign.key
         working-directory: gohome
       - uses: goreleaser/goreleaser-action@v6
         with:
