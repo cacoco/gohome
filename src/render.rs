@@ -68,10 +68,10 @@ handlebars::handlebars_helper!(match_string: |pattern: String, path: String| {
     }
 });
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Renderer {
     host: String,
-    csrf_token: csrf::CsrfToken,
+    csrf_key: csrf::AesGcmCsrfProtection,
     pub(crate) db: db::Db,
     pub(crate) handlebars: handlebars::Handlebars<'static>,
 }
@@ -84,11 +84,7 @@ impl Renderer {
     pub fn new(host: &str, db: db::Db, handlebars: handlebars::Handlebars<'static>) -> Self {
         let mut secret_key = [0u8; 32];
         rand::rng().fill_bytes(&mut secret_key);
-        let protect = AesGcmCsrfProtection::from_key(secret_key);
-
-        let mut nonce = [0u8; 64];
-        rand::rng().fill_bytes(&mut nonce);
-        let csrf_token: csrf::CsrfToken = protect.generate_token(&nonce).unwrap();
+        let aes_gcm_csrf_protection = AesGcmCsrfProtection::from_key(secret_key); 
 
         let mut bars = handlebars.clone();
         bars.register_helper("query_escape", Box::new(query_escape));
@@ -103,14 +99,17 @@ impl Renderer {
         bars.register_helper("match", Box::new(match_string));
         Self {
             host: host.to_string(),
-            csrf_token,
+            csrf_key: aes_gcm_csrf_protection,
             db,
             handlebars: bars,
         }
     }
 
     pub fn xsrf(&self) -> String {
-        self.csrf_token.b64_string()
+        let mut nonce = [0u8; 64];
+        rand::rng().fill_bytes(&mut nonce);
+        let csrf_token: csrf::CsrfToken = self.csrf_key.generate_token(&nonce).unwrap();
+        csrf_token.b64_string()
     }
 }
 
@@ -153,7 +152,7 @@ impl Renderer {
                 links.append(&mut results);
             }
             Err(e) => {
-                tracing::error!("home 1: {e}");
+                tracing::error!("{e}");
             }
         }
 
@@ -170,7 +169,7 @@ impl Renderer {
         ) {
             Ok(response) => html(response),
             Err(e) => {
-                tracing::error!("home 2: {e}");
+                tracing::error!("{e}");
                 redirect("/")
             }
         }
@@ -185,13 +184,13 @@ impl Renderer {
                 ) {
                     Ok(response) => html(response),
                     Err(e) => {
-                        tracing::error!("detail 1: {e}");
+                        tracing::error!("{e}");
                         redirect("/")
                     }
                 }
             }
             Err(e) => {
-                tracing::error!("detail 2: {e}");
+                tracing::error!("{e}");
                 redirect("/")
             }
         }
@@ -206,21 +205,25 @@ impl Renderer {
                 ) {
                     Ok(response) => html(response),
                     Err(e) => {
-                        tracing::error!("all 1: {e}");
+                        tracing::error!("{e}");
                         redirect("/.all")
                     }
                 }
             }
             Err(e) => {
-                tracing::error!("all 2: {e}");
+                tracing::error!("{e}");
                 redirect("/.all")
             }
         }
     }
 
     pub async fn create(&self, request: CreateUpdateRequest, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        if xsrf != self.xsrf() {
-            return redirect("/");
+        match self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
+            Err(e) => {
+                tracing::error!("Invalid xsrf token: {e}");
+                return redirect("/");
+            },
+            _ => {}, // do nothing
         }
 
         let link = request.clone().into();
@@ -236,13 +239,13 @@ impl Renderer {
                         ) {
                             Ok(response) => html(response),
                             Err(e) => {
-                                tracing::error!("create 1: {e}");
+                                tracing::error!("{e}");
                                 redirect("/")
                             }
                         }
                     },
                     Err(e) => {
-                        tracing::error!("create 2: {e}");
+                        tracing::error!("{e}");
                         redirect("/")
                     }
                 };
@@ -279,8 +282,12 @@ impl Renderer {
     }
 
     pub async fn update(&self, request: CreateUpdateRequest, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        if xsrf != self.xsrf() {
-            return redirect("/");
+        match self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
+            Err(e) => {
+                tracing::error!("Invalid xsrf token: {e}");
+                return redirect("/");
+            },
+            _ => {}, // do nothing
         }
 
         let short = request.short.as_str();
@@ -300,19 +307,19 @@ impl Renderer {
                         ) {
                             Ok(response) => Ok(Box::new(warp::reply::html(response))),
                             Err(e) => {
-                                tracing::error!("update 1: {e}");
+                                tracing::error!("{e}");
                                 redirect(&format!("/.detail/{}", short))
                             }
                         }
                     },
                     Err(e) => {
-                        tracing::error!("update 2: {e}");
+                        tracing::error!("{e}");
                         redirect(&format!("/.detail/{}", short))
                     }
                 }
             }
             Err(e) => {
-                tracing::error!("update 3: {e}");
+                tracing::error!("{e}");
                 redirect_with_status(
                     &format!("/.detail/{}", &request.short),
                     warp::http::StatusCode::NOT_FOUND,
@@ -322,8 +329,12 @@ impl Renderer {
     }
 
     pub async fn delete(&self, short: &str, xsrf: &str) -> Result<Box<dyn warp::Reply>, Infallible> {
-        if xsrf != self.xsrf() {
-            return redirect("/");
+        match self.csrf_key.parse_token(&data_encoding::BASE64.decode(xsrf.as_bytes()).unwrap()) {
+            Err(e) => {
+                tracing::error!("Invalid xsrf token: {e}");
+                return redirect("/");
+            },
+            _ => {}, // do nothing
         }
 
         match self.db.link.load(short).await {
@@ -337,13 +348,13 @@ impl Renderer {
                         ) {
                             Ok(response) => html(response),
                             Err(e) => {
-                                tracing::error!("delete 1: {e}");
+                                tracing::error!("{e}");
                                 redirect(&format!("/.detail/{}", short))
                             }
                         }
                     }
                     Err(e) => {
-                        tracing::error!("delete 2: {e}");
+                        tracing::error!("{e}");
                         redirect(&format!("/.detail/{}", short))
                     }
                 };
@@ -352,7 +363,7 @@ impl Renderer {
                 reply
             }
             Err(e) => {
-                tracing::error!("delete 3: {e}");
+                tracing::error!("{e}");
                 redirect_with_status("/", warp::http::StatusCode::NOT_FOUND)
             }
         }
@@ -365,7 +376,7 @@ impl Renderer {
         {
             Ok(response) => html(response),
             Err(e) => {
-                tracing::error!("help 1: {e}");
+                tracing::error!("{e}");
                 redirect("/")
             }
         }
@@ -388,7 +399,7 @@ impl Renderer {
                 )))
             }
             Err(e) => {
-                tracing::error!("export 1: {e}");
+                tracing::error!("{e}");
                 redirect("/")
             }
         }
@@ -404,7 +415,7 @@ impl Renderer {
             let path = Renderer::path_remainder(full_path, short);
             self.expand_link(&path, query_params, &link.long).map_or_else(
                 |e| {
-                    tracing::error!("get 1: {e}");
+                    tracing::error!("{e}");
                     redirect_with_status("/", warp::http::StatusCode::INTERNAL_SERVER_ERROR)
                 },
                 |location| redirect_with_status(location.as_ref(), warp::http::StatusCode::PERMANENT_REDIRECT),
