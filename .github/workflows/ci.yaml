@@ -14,7 +14,7 @@ env:
 jobs:
     rustfmt:
         if: ${{ github.event_name == 'pull_request' }}
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04-arm
         permissions:
             contents: read
             pull-requests: write
@@ -28,7 +28,7 @@ jobs:
                 token: ${{ secrets.GITHUB_TOKEN }}
                 mode: review
     test:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04-arm
         steps:
             - uses: actions/checkout@v5
             - uses: arduino/setup-task@v2
