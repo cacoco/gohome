@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM arm64v8/alpine:latest
 ARG EXECUTABLE="gohome"
 
 RUN apk update && apk add --no-cache ca-certificates bash

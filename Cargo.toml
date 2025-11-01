@@ -25,7 +25,7 @@ tokio = { version = "1.47.1", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 url = { version = "2.5.7", features = ["std"] }
-warp = { version = "0.4.1", features = ["server"] }
+warp = { version = "0.4.2", features = ["server"] }
 url-escape = "0.1.1"
 reqwest = { version = "0.12.23", features = ["json"] }
 
