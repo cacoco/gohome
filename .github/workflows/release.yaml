@@ -11,7 +11,7 @@ env:
   RUST_VERSION: '1.90.0'
 jobs:
   bump-version:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     steps:
       - name: dump context
         env:
