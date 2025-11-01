@@ -35,7 +35,7 @@ jobs:
       - uses: peter-evans/create-pull-request@v7
         id: create-pull-request
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PAT }}
           add-paths: |
             Cargo.toml
             Cargo.lock
