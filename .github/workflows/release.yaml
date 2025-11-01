@@ -11,7 +11,7 @@ env:
   RUST_VERSION: '1.90.0'
 jobs:
   bump-version:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-latest
     steps:
       - name: dump context
         env:
@@ -53,7 +53,7 @@ jobs:
             [1]: https://github.com/peter-evans/create-pull-request
           labels: |
             release
-      - run: gh pr merge --squash --auto "${{ steps.create-pull-request.outputs.pull-request-number }}"
+      - run: gh pr merge --merge --auto "${{ steps.create-pull-request.outputs.pull-request-number }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   goreleaser:
