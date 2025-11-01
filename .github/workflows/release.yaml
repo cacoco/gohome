@@ -83,9 +83,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COSIGN_PWD: ${{ secrets.COSIGN_PWD }}
-      # - uses: actions/attest-build-provenance@v3
-      #   with:
-      #     subject-checksums: './dist/${{ github.event.repository.name }}_checksums.txt'
-      #     push-to-registry: true
-      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/attest-build-provenance@v3
+        with:
+          subject-checksums: './dist/${{ github.event.repository.name }}_checksums.txt'
+          push-to-registry: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
   

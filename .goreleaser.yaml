@@ -28,7 +28,6 @@ builds:
     flags:
       - --release
     targets:
-      - x86_64-unknown-linux-musl
       - aarch64-unknown-linux-musl
     mod_timestamp: "{{ .CommitTimestamp }}"
 
