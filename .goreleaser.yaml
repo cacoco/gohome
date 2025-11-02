@@ -19,7 +19,7 @@ before:
   hooks:
     - rustup default stable
     - rustup target add aarch64-unknown-linux-musl
-    - cargo install --locked cargo-zigbuild --verbose
+    - cargo install --locked cargo-zigbuild
     - cargo fetch --locked
 
 builds:

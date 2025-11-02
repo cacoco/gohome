@@ -49,8 +49,6 @@ jobs:
           components: "cargo"
           toolchain: ${{ env.RUST_VERSION }}
       - uses: goto-bus-stop/setup-zig@v2
-      - run: |
-          cargo install --locked cargo-zigbuild
       - uses: sigstore/cosign-installer@v3.8.0
       - uses: anchore/sbom-action/download-syft@v0.18.0
       - run:
