@@ -4,17 +4,6 @@ project_name: gohome
 
 archives:
   - formats: [tar.gz]
-    # this name template makes the OS and Arch compatible with the results of `uname`.
-    name_template: >-
-      {{ .ProjectName }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-    # use zip for windows archives
-    format_overrides:
-      - goos: windows
-        formats: [zip]
 
 before:
   hooks:
@@ -25,6 +14,7 @@ before:
 
 builds:
   - builder: rust
+    binary: gohome
     flags:
       - --release
     targets:
@@ -86,14 +76,15 @@ release:
 
 sboms:
   - artifacts: archive
+    args: ["--from", "dir", "../", "--output", "cyclonedx-json=$document"]
 
-signs:
-  - cmd: cosign
-    stdin: "{{ .Env.COSIGN_PWD }}"
-    args:
-      - "sign-blob"
-      - "--key=cosign.key"
-      - "--output-signature=${signature}"
-      - "${artifact}"
-      - "--yes" # needed for cosign 2.0.0+
-    artifacts: all
+# signs:
+#   - cmd: cosign
+#     stdin: "{{ .Env.COSIGN_PWD }}"
+#     args:
+#       - "sign-blob"
+#       - "--key=cosign.key"
+#       - "--output-signature=${signature}"
+#       - "${artifact}"
+#       - "--yes" # needed for cosign 2.0.0+
+#     artifacts: all
