@@ -78,13 +78,13 @@ sboms:
   - artifacts: archive
     args: ["--from", "dir", "../", "--output", "cyclonedx-json=$document"]
 
-# signs:
-#   - cmd: cosign
-#     stdin: "{{ .Env.COSIGN_PWD }}"
-#     args:
-#       - "sign-blob"
-#       - "--key=cosign.key"
-#       - "--output-signature=${signature}"
-#       - "${artifact}"
-#       - "--yes" # needed for cosign 2.0.0+
-#     artifacts: all
+signs:
+  - cmd: cosign
+    stdin: "{{ .Env.COSIGN_PWD }}"
+    args:
+      - "sign-blob"
+      - "--key=cosign.key"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes" # needed for cosign 2.0.0+
+    artifacts: all
