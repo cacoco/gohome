@@ -19,8 +19,8 @@ before:
   hooks:
     - rustup default stable
     - rustup target add aarch64-unknown-linux-musl
-    - cargo install{{ if not .IsSnapshot }} --locked{{ end }} cargo-zigbuild
-    - cargo fetch{{ if not .IsSnapshot }} --locked{{ end }}
+    - cargo install --locked cargo-zigbuild
+    - cargo fetch --locked
 
 builds:
   - id: gohome
