@@ -31,10 +31,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           mode: review
   test-goreleaser-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v5
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
         with:
           name: goreleaser
@@ -47,12 +46,24 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: "cargo"
+          targets: "aarch64-unknown-linux-musl"
           toolchain: ${{ env.RUST_VERSION }}
       - uses: goto-bus-stop/setup-zig@v2
       - uses: sigstore/cosign-installer@v3.8.0
       - uses: anchore/sbom-action/download-syft@v0.18.0
       - run:
           echo "${{ secrets.COSIGN_KEY }}" | base64 --decode > cosign.key
+      - uses: actions/cache@v4
+        continue-on-error: false
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target/
+          key: ${{ runner.os }}-${{ github.workflow }}-cargo-goreleaser-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.workflow }}-cargo-goreleaser-test-
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
