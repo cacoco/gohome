@@ -3,8 +3,18 @@ version: 2
 project_name: gohome
 
 archives:
-  - formats: [tar.gz]
-
+  - id: gohome
+    formats: [tar.gz]
+    ids:
+      - gohome
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if .Arm }}v{{ .Arm }}
+      {{- else }}{{ .Arch }}{{ end }}
+      
 before:
   hooks:
     - rustup default stable
@@ -13,7 +23,8 @@ before:
     - cargo fetch --locked
 
 builds:
-  - builder: rust
+  - id: gohome
+    builder: rust
     binary: gohome
     flags:
       - --release
@@ -31,10 +42,15 @@ changelog:
 checksum:
   name_template: "{{ .ProjectName }}_checksums.txt"
 
-dockers:
-  - image_templates:
-      - "ghcr.io/cacoco/gohome:{{ .Tag }}"
-      - "ghcr.io/cacoco/gohome:latest"
+dockers_v2:
+  - id: gohome
+    ids:
+      - gohome
+    images:
+      - "ghcr.io/cacoco/gohome"
+    tags:
+      - "{{ .Tag }}"
+      - "latest"
     dockerfile: Dockerfile
     extra_files:
       - entrypoint.sh
@@ -46,9 +62,19 @@ dockers:
       - templates/help.hbs
       - templates/home.hbs
       - templates/success.hbs
+    labels:
+      "org.opencontainers.image.create": "{{.Date}}"
+      "org.opencontainers.image.title": "{{.ProjectName}}"
+      "org.opencontainers.image.revision": "{{.FullCommit}}"
+      "org.opencontainers.image.version": "{{.Version}}"
+    platforms:
+      - linux/arm64
 
 docker_signs:
-  - cmd: cosign
+  - id: gohome
+    ids:
+      - gohome
+    cmd: cosign
     artifacts: manifests
     args:
       - "sign"
@@ -64,6 +90,8 @@ milestones:
     name_template: "{{ .Tag }}"
 
 release:
+  ids:
+    - gohome
   github:
     owner: cacoco
     name: gohome
@@ -75,16 +103,22 @@ release:
     Released by [GoReleaser](https://github.com/goreleaser/goreleaser).
 
 sboms:
-  - artifacts: archive
+  - id: gohome
+    ids:
+      - gohome
+    artifacts: archive
     args: ["--from", "dir", "../", "--output", "cyclonedx-json=$document"]
 
-signs:
-  - cmd: cosign
-    stdin: "{{ .Env.COSIGN_PWD }}"
-    args:
-      - "sign-blob"
-      - "--key=cosign.key"
-      - "--output-signature=${signature}"
-      - "${artifact}"
-      - "--yes" # needed for cosign 2.0.0+
-    artifacts: all
+# signs:
+#   - id: gohome
+#     ids:
+#       - gohome
+#     cmd: cosign
+#     stdin: "{{ .Env.COSIGN_PWD }}"
+#     args:
+#       - "sign-blob"
+#       - "--key=cosign.key"
+#       - "--output-signature=${signature}"
+#       - "${artifact}"
+#       - "--yes" # needed for cosign 2.0.0+
+#     artifacts: all
