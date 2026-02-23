@@ -90,9 +90,8 @@ files: aarch64: goreleaser.#Project & {
 			owner: "cacoco"
 			name:  "gohome"
 		}
-		mode:                       "replace"
-		replace_existing_artifacts: false
-		footer:                     "\n---\n\nReleased by [GoReleaser](https://github.com/goreleaser/goreleaser)."
+		mode:   "replace"
+		footer: "\n---\n\nReleased by [GoReleaser](https://github.com/goreleaser/goreleaser)."
 	}
 
 	sboms: [{
@@ -193,9 +192,8 @@ files: x86_64: goreleaser.#Project & {
 			owner: "cacoco"
 			name:  "gohome"
 		}
-		mode:                       "replace"
-		replace_existing_artifacts: false
-		footer:                     "\n---\n\nReleased by [GoReleaser](https://github.com/goreleaser/goreleaser)."
+		mode:   "replace"
+		footer: "\n---\n\nReleased by [GoReleaser](https://github.com/goreleaser/goreleaser)."
 	}
 
 	sboms: [{
