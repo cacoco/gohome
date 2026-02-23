@@ -7,7 +7,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use csrf::{AesGcmCsrfProtection, CsrfProtection};
 use handlebars::Handlebars;
-use rand::RngCore;
+use rand::Rng;
 use regex::Regex;
 use url::Url;
 

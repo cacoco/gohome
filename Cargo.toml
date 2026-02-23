@@ -7,31 +7,32 @@ edition = "2024"
 path = "src/lib.rs"
 
 [dependencies]
-chrono = { version = "0.4.41", features = ["serde"] }
-clap = { version = "4.5.45", features = ["derive", "env"] }
+chrono = { version = "0.4.43", features = ["serde"] }
+clap = { version = "4.5.60", features = ["derive", "env"] }
 csrf = "0.5.0"
-data-encoding = "2.0.0"
-handlebars = { version = "6.3.2", features = ["dir_source"] }
+data-encoding = "2.10.0"
+handlebars = { version = "6.4.0", features = ["dir_source"] }
 http-body-util = "0.1.3"
-hyper = "1.7.0"
-openssl = { version = "0.10", features = ["vendored"] }
-rand = "0.9.2"
-regex = "1.11.2"
-rusqlite = { version = "0.37.0", features = ["bundled", "chrono", "serde_json"] }
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.142"
+hyper = "1.8.1"
+rand = "0.10.0"
+regex = "1.12.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+ring = "0.17.14"
+rustls = { version = "0.23.36", default-features = false, features = ["ring", "std", "tls12"] }
+rusqlite = { version = "0.38.0", features = ["bundled", "chrono", "serde_json"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 serde-jsonlines = "0.7.0"
-shadow-rs = { version = "1.2.1", features = ["metadata"] }
-tokio = { version = "1.47.1", features = ["full"] }
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-url = { version = "2.5.7", features = ["std"] }
+shadow-rs = { version = "1.7.0", features = ["metadata"] }
+tokio = { version = "1.49.0", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+url = { version = "2.5.8", features = ["std"] }
 warp = { version = "0.4.2", features = ["server"] }
 url-escape = "0.1.1"
-reqwest = { version = "0.12.23", features = ["json"] }
 
 [build-dependencies]
-shadow-rs = "1.2.1"
+shadow-rs = "1.7.0"
 
 [dev-dependencies]
-tempfile = "3.20.0"
+tempfile = "3.25.0"

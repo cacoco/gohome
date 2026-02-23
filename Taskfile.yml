@@ -10,6 +10,12 @@ includes:
 # env:
 
 tasks:
+
+  clean:
+    cmds:
+      - 'rm -rf dist/ aarch64/ x86_64/'
+      - 'cargo clean'
+
   'markdown:lint':
     cmds:
       - 'markdownlint **/*.md --fix --disable MD013'
@@ -19,3 +25,13 @@ tasks:
   'rust:version':
     cmds:
       - 'toml get -r rust-toolchain.toml toolchain.channel'
+  
+  'goreleaser:generate':
+    desc: 'Generate .goreleaser.yaml from cue/goreleaser.cue'
+    deps:
+      - clean
+    cmds:
+      - mkdir -p aarch64 x86_64
+      - 'cue export ./cue/... -e files.aarch64 --out yaml --force --outfile aarch64/.goreleaser.yaml'
+      - 'cue export ./cue/... -e files.x86_64 --out yaml --force --outfile x86_64/.goreleaser.yaml'
+

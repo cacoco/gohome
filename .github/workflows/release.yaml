@@ -8,7 +8,6 @@ concurrency:
 permissions: write-all
 env:
   CONTAINER_REGISTRY: 'ghcr.io'
-  RUST_VERSION: '1.90.0'
 jobs:
   bump-version:
     runs-on: ubuntu-latest
@@ -18,13 +17,20 @@ jobs:
           GITHUB_CONTEXT: ${{ toJson(github) }}
         run: echo "$GITHUB_CONTEXT"
       - uses: actions/checkout@v5
+      - name: read rust version from rust-toolchain.toml
+        id: rust-version
+        run: |
+          RUST_VERSION=$(awk -F'"' '/^channel/{print $2; exit}' rust-toolchain.toml)
+          echo "::notice::file=rust-toolchain.toml,line=2::rust version = $RUST_VERSION"
+          echo "version=$RUST_VERSION" >> "$GITHUB_OUTPUT"
+        shell: bash
       - uses: dtolnay/rust-toolchain@master
         with:
           components: rustfmt
-          toolchain: ${{ env.RUST_VERSION }}
-      - run: |
-          cargo install cargo-edit
-          cargo install toml-cli
+          toolchain: ${{ steps.rust-version.outputs.version }}
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall --no-confirm --force cargo-edit
+      - run: scripts/install-toml.sh
       - id: pkg-version
         run: |
           ref_string="${{ github.ref }}"
@@ -58,11 +64,27 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   goreleaser:
     needs: ["bump-version"]
-    runs-on: ubuntu-24.04-arm
+    strategy:
+      matrix:
+        include:
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            rust_target: aarch64-unknown-linux-musl
+          - arch: x86_64
+            runner: ubuntu-latest
+            rust_target: x86_64-unknown-linux-musl
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+      - name: read rust version from rust-toolchain.toml
+        id: rust-version
+        run: |
+          RUST_VERSION=$(awk -F'"' '/^channel/{print $2; exit}' rust-toolchain.toml)
+          echo "::notice::file=rust-toolchain.toml,line=2::rust version = $RUST_VERSION"
+          echo "version=$RUST_VERSION" >> "$GITHUB_OUTPUT"
+        shell: bash
       - uses: docker/setup-buildx-action@v3
         with:
           name: goreleaser
@@ -74,22 +96,46 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: "cargo"
-          targets: "aarch64-unknown-linux-musl"
-          toolchain: ${{ env.RUST_VERSION }}
-      - uses: goto-bus-stop/setup-zig@v2
-      - uses: sigstore/cosign-installer@v3.8.0
+          targets: ${{ matrix.rust_target }}
+          toolchain: ${{ steps.rust-version.outputs.version }}
+      - uses: swatinem/rust-cache@v2
+      - uses: mlugg/setup-zig@v2
+      - uses: sigstore/cosign-installer@main
       - uses: anchore/sbom-action/download-syft@v0.18.0
-      - run:
+      - name: write cosign.key file for signing
+        run:
           echo "${{ secrets.COSIGN_KEY }}" | base64 --decode > cosign.key
+      - name: read cue version from cue.mod
+        id: cue-version
+        run: |
+          CUE_VERSION=$(awk -F'"' '/^\tversion:/{print $2; exit}' cue.mod/module.cue)
+          echo "::notice::file=cue.mod/module.cue,line=3::cue version = $CUE_VERSION"
+          echo "version=$CUE_VERSION" >> "$GITHUB_OUTPUT"
+        shell: bash
+      - uses: cue-lang/setup-cue@v1.0.1
+        with:
+          version: ${{ steps.cue-version.outputs.version }}
+      - uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: generate .goreleaser.yaml from cue
+        run: |
+          task goreleaser:generate
+        shell: bash
+      - run: sudo apt-get install -y lld
+        shell: bash
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall --no-confirm --force cargo-zigbuild
+        shell: bash
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean
+          args: release --verbose --clean --config ${{ matrix.arch }}/.goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COSIGN_PWD: ${{ secrets.COSIGN_PWD }}
+          RUSTFLAGS: '-C linker=/usr/bin/ld.lld -C linker-flavor=ld.lld'
       - uses: actions/attest-build-provenance@v3
         with:
           subject-checksums: './dist/${{ github.event.repository.name }}_checksums.txt'
