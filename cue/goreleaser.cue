@@ -55,7 +55,7 @@ files: aarch64: goreleaser.#Project & {
 			"org.opencontainers.image.title":       "{{.ProjectName}}"
 			"org.opencontainers.image.revision":    "{{.FullCommit}}"
 			"org.opencontainers.image.version":     "{{.Version}}"
-			"org.opencontainers.image.description": "A Rust-powered port of the Tailscale [golink](https://github.com/tailscale/golink)"
+			"org.opencontainers.image.description": "A Rust-powered port of the Tailscale golink (https://github.com/tailscale/golink) application."
 		}
 		platforms: ["linux/arm64"]
 		flags: ["--provenance=false"]
@@ -167,7 +167,7 @@ files: x86_64: goreleaser.#Project & {
 			"org.opencontainers.image.title":       "{{.ProjectName}}"
 			"org.opencontainers.image.revision":    "{{.FullCommit}}"
 			"org.opencontainers.image.version":     "{{.Version}}"
-			"org.opencontainers.image.description": "A Rust-powered port of the Tailscale [golink](https://github.com/tailscale/golink)"
+			"org.opencontainers.image.description": "A Rust-powered port of the Tailscale golink (https://github.com/tailscale/golink) application."
 		}
 		platforms: ["linux/amd64"]
 		flags: ["--provenance=false"]
