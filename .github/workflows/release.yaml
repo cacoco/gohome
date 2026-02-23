@@ -61,6 +61,28 @@ jobs:
       - run: gh pr merge --squash --auto "${{ steps.create-pull-request.outputs.pull-request-number }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: wait for pull request to be merged
+        run: |
+          pr_number="${{ steps.create-pull-request.outputs.pull-request-number }}"
+          if [ -z "$pr_number" ]; then
+            echo "No PR created, skipping wait"
+            exit 0
+          fi
+          echo "Waiting for PR #$pr_number to be merged..."
+          while true; do
+            state=$(gh pr view "$pr_number" --json state --jq '.state')
+            if [ "$state" = "MERGED" ]; then
+              echo "PR #$pr_number merged successfully"
+              break
+            elif [ "$state" = "CLOSED" ]; then
+              echo "Error: PR #$pr_number was closed without merging" >&2
+              exit 1
+            fi
+            echo "  PR state: $state, waiting 30s..."
+            sleep 30
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   goreleaser:
     needs: ["bump-version"]
     strategy:
