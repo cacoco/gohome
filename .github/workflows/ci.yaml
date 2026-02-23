@@ -34,6 +34,15 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: read rust version from rust-toolchain.toml
+        id: rust-version
+        run: |
+          RUST_VERSION=$(awk -F'"' '/^channel/{print $2; exit}' rust-toolchain.toml)
+          echo "::notice::file=rust-toolchain.toml,line=2::rust version = $RUST_VERSION"
+          echo "version=$RUST_VERSION" >> "$GITHUB_OUTPUT"
+        shell: bash
       - uses: docker/setup-buildx-action@v3
         with:
           name: goreleaser
@@ -45,33 +54,46 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: "cargo"
-          targets: "aarch64-unknown-linux-musl"
-          toolchain: ${{ env.RUST_VERSION }}
-      - uses: goto-bus-stop/setup-zig@v2
-      - uses: sigstore/cosign-installer@v3.8.0
+          targets: aarch64-unknown-linux-musl
+          toolchain: ${{ steps.rust-version.outputs.version }}
+      - uses: swatinem/rust-cache@v2
+      - uses: mlugg/setup-zig@v2
+      - uses: sigstore/cosign-installer@main
       - uses: anchore/sbom-action/download-syft@v0.18.0
-      - run:
+      - name: write cosign.key file for signing
+        run:
           echo "${{ secrets.COSIGN_KEY }}" | base64 --decode > cosign.key
-      - uses: actions/cache@v4
-        continue-on-error: false
+      - name: read cue version from cue.mod
+        id: cue-version
+        run: |
+          CUE_VERSION=$(awk -F'"' '/^\tversion:/{print $2; exit}' cue.mod/module.cue)
+          echo "::notice::file=cue.mod/module.cue,line=3::cue version = $CUE_VERSION"
+          echo "version=$CUE_VERSION" >> "$GITHUB_OUTPUT"
+        shell: bash
+      - uses: cue-lang/setup-cue@v1.0.1
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            target/
-          key: ${{ runner.os }}-${{ github.workflow }}-cargo-goreleaser-test-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ github.workflow }}-cargo-goreleaser-test-
+          version: ${{ steps.cue-version.outputs.version }}
+      - uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: generate .goreleaser.yaml from cue
+        run: |
+          task goreleaser:generate
+        shell: bash
+      - run: sudo apt-get install -y lld
+        shell: bash
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall --no-confirm --force cargo-zigbuild
+        shell: bash
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
-          args: release --snapshot
+          args: release --snapshot --config aarch64/.goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COSIGN_PWD: ${{ secrets.COSIGN_PWD }}
+          RUSTFLAGS: '-C linker=/usr/bin/ld.lld -C linker-flavor=ld.lld'
   test:
     runs-on: ubuntu-latest
     steps:
