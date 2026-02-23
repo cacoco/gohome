@@ -38,7 +38,7 @@ files: aarch64: goreleaser.#Project & {
 		ids: ["gohome"]
 		images: ["ghcr.io/cacoco/gohome"]
 		tags: ["{{ .Tag }}", "latest"]
-		dockerfile: "Dockerfile"
+		dockerfile: "aarch64/Dockerfile"
 		extra_files: [
 			"entrypoint.sh",
 			"static/base.css",
@@ -155,7 +155,7 @@ files: x86_64: goreleaser.#Project & {
 		ids: ["gohome"]
 		images: ["ghcr.io/cacoco/gohome"]
 		tags: ["{{ .Tag }}", "latest"]
-		dockerfile: "Dockerfile"
+		dockerfile: "x86_64/Dockerfile"
 		extra_files: [
 			"entrypoint.sh",
 			"static/base.css",

@@ -13,7 +13,8 @@ tasks:
 
   clean:
     cmds:
-      - 'rm -rf dist/ aarch64/ x86_64/'
+      - 'rm -f aarch64/.goreleaser.yaml x86_64/.goreleaser.yaml'
+      - 'rm -rf dist/'
       - 'cargo clean'
 
   'markdown:lint':
@@ -31,7 +32,6 @@ tasks:
     deps:
       - clean
     cmds:
-      - mkdir -p aarch64 x86_64
       - 'cue export ./cue/... -e files.aarch64 --out yaml --force --outfile aarch64/.goreleaser.yaml'
       - 'cue export ./cue/... -e files.x86_64 --out yaml --force --outfile x86_64/.goreleaser.yaml'
 
