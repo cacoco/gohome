@@ -90,8 +90,9 @@ files: aarch64: goreleaser.#Project & {
 			owner: "cacoco"
 			name:  "gohome"
 		}
-		mode:   "append"
-		footer: "\n---\n\nReleased by [GoReleaser](https://github.com/goreleaser/goreleaser)."
+		mode:                       "replace"
+		replace_existing_artifacts: false
+		footer:                     "\n---\n\nReleased by [GoReleaser](https://github.com/goreleaser/goreleaser)."
 	}
 
 	sboms: [{
@@ -143,11 +144,6 @@ files: x86_64: goreleaser.#Project & {
 		mod_timestamp: "{{ .CommitTimestamp }}"
 	}]
 
-	changelog: {
-		sort: "asc"
-		filters: exclude: ["^docs:", "^test:"]
-	}
-
 	checksum: name_template: "{{ .ProjectName }}_x86_64_checksums.txt"
 
 	dockers_v2: [{
@@ -191,24 +187,15 @@ files: x86_64: goreleaser.#Project & {
 		]
 	}]
 
-	milestones: [{
-		repo: {
-			owner: "cacoco"
-			name:  "gohome"
-		}
-		close:         true
-		fail_on_error: false
-		name_template: "{{ .Tag }}"
-	}]
-
 	release: {
 		ids: ["gohome"]
 		github: {
 			owner: "cacoco"
 			name:  "gohome"
 		}
-		mode:   "append"
-		footer: "\n---\n\nReleased by [GoReleaser](https://github.com/goreleaser/goreleaser)."
+		mode:                       "replace"
+		replace_existing_artifacts: false
+		footer:                     "\n---\n\nReleased by [GoReleaser](https://github.com/goreleaser/goreleaser)."
 	}
 
 	sboms: [{
