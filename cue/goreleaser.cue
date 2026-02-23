@@ -31,7 +31,7 @@ files: aarch64: goreleaser.#Project & {
 		filters: exclude: ["^docs:", "^test:"]
 	}
 
-	checksum: name_template: "{{ .ProjectName }}_checksums.txt"
+	checksum: name_template: "{{ .ProjectName }}_aarch64_checksums.txt"
 
 	dockers_v2: [{
 		id: "gohome"
@@ -148,7 +148,7 @@ files: x86_64: goreleaser.#Project & {
 		filters: exclude: ["^docs:", "^test:"]
 	}
 
-	checksum: name_template: "{{ .ProjectName }}_checksums.txt"
+	checksum: name_template: "{{ .ProjectName }}_x86_64_checksums.txt"
 
 	dockers_v2: [{
 		id: "gohome"
